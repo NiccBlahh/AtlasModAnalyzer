@@ -134,7 +134,7 @@ body {
 <div class="main">
   <div class="controls">
     <input type="text" id="pathInput" class="path-input" placeholder="Searching for Minecraft directories...">
-    <button id="scanBtn" class="btn" onclick="window.external.TriggerScan(document.getElementById('pathInput').value)">Scan Directory</button>
+    <button id="scanBtn" class="btn" onclick="document.title='TRIGGER_SCAN|' + document.getElementById('pathInput').value">Scan Directory</button>
   </div>
   
   <div class="terminal-container" id="terminal">
@@ -168,9 +168,8 @@ body {
 </html>
 '@
 
-# --- Unified Scanning Helper ---
-# A global variable is used here so it can be cleanly fetched inside the UI interop class
-$Global:SuspiciousPatternsList = @("AimAssist","AutoAnchor","AutoCrystal","AutoTotem","JumpReset","VelocitySpoof","GrimVelocity","KillAura","TriggerBot","CheatBreaker","WalksyOptimizer","WalksyCrystalOptimizerMod","coord[-_ ]?mod")
+# --- Scanning Heuristics ---
+$SuspiciousPatternsList = @("AimAssist","AutoAnchor","AutoCrystal","AutoTotem","JumpReset","VelocitySpoof","GrimVelocity","KillAura","TriggerBot","CheatBreaker","WalksyOptimizer","WalksyCrystalOptimizerMod","coord[-_ ]?mod")
 
 function Resolve-GamePath {
     $defaultPath = "$env:USERPROFILE\AppData\Roaming\.minecraft\mods"
@@ -204,98 +203,86 @@ function Query-Modrinth {
     return @{ Name = ""; Slug = "" }
 }
 
-# --- UI Interop Bridge Class ---
-[PermissionSet([Security.Permissions.SecurityAction]::Demand, Name="FullTrust")]
-[System.Runtime.InteropServices.ComVisible($true)]
-public class WebBridge {
-    hidden [System.Windows.Forms.WebBrowser] $browser
-    
-    WebBridge([System.Windows.Forms.WebBrowser]$b) {
-        $this.browser = $b
+# --- Core Scan Execution Core ---
+function Run-ScanOperation {
+    param([System.Windows.Forms.WebBrowser]$browser, [string]$targetedPath)
+
+    $InvokeUI = {
+        param($func, $argsList)
+        if ($browser.Document) { $browser.Document.InvokeScript($func, $argsList) | Out-Null }
     }
 
-    public void TriggerScan(string targetedPath) {
-        if ([string]::IsNullOrWhiteSpace(targetedPath) -or -not (Test-Path $targetedPath -PathType Container)) {
-            $this.InvokeUI("setStatus", @("warn", "Directory Invalid"))
-            $this.InvokeUI("log", @("Error: The directory path specified does not exist.", "log-danger"))
-            return
-        }
+    if ([string]::IsNullOrWhiteSpace($targetedPath) -or -not (Test-Path $targetedPath -PathType Container)) {
+        &$InvokeUI "setStatus" @("warn", "Directory Invalid")
+        &$InvokeUI "log" @("Error: The directory path specified does not exist.", "log-danger")
+        return
+    }
 
-        $this.InvokeUI("setStatus", @("scanning", "Analyzing Content"))
-        $this.InvokeUI("clearLog", $null)
-        $this.InvokeUI("log", @("Scanning path: $targetedPath...", "log-info"))
+    &$InvokeUI "setStatus" @("scanning", "Analyzing Content")
+    &$InvokeUI "clearLog" $null
+    &$InvokeUI "log" @("Scanning path: $targetedPath...", "log-info")
 
-        try {
-            $jarFiles = Get-ChildItem -Path $targetedPath -Filter *.jar -Force
-        } catch {
-            $this.InvokeUI("log", @("Error scanning folder: $($_.Exception.Message)", "log-danger"))
-            $this.InvokeUI("setStatus", @("warn", "Execution Error"))
-            return
-        }
+    try {
+        $jarFiles = Get-ChildItem -Path $targetedPath -Filter *.jar -Force
+    } catch {
+        &$InvokeUI "log" @("Error scanning folder: $($_.Exception.Message)", "log-danger")
+        &$InvokeUI "setStatus" @("warn", "Execution Error")
+        return
+    }
 
-        if ($jarFiles.Count -eq 0) {
-            $this.InvokeUI("log", @("Scan finished: Zero (.jar) modification configurations found.", "log-warn"))
-            $this.InvokeUI("setStatus", @("done", "Finished"))
-            return
-        }
+    if ($jarFiles.Count -eq 0) {
+        &$InvokeUI "log" @("Scan finished: Zero (.jar) modification configurations found.", "log-warn")
+        &$InvokeUI "setStatus" @("done", "Finished")
+        return
+    }
 
-        $this.InvokeUI("log", @("Found $($jarFiles.Count) file(s). Cross-referencing signatures...", "log-muted"))
+    &$InvokeUI "log" @("Found $($jarFiles.Count) file(s). Cross-referencing signatures...", "log-muted")
 
-        $verifiedCount = 0
-        $suspCount = 0
-        $unknownCount = 0
+    $verifiedCount = 0
+    $suspCount = 0
+    $unknownCount = 0
 
-        foreach ($jar in $jarFiles) {
-            # Keeps the UI responsive and processing logs progressively
-            [System.Windows.Forms.Application]::DoEvents() 
-            
-            # 1. Check Hash against Modrinth API
-            $hash = Get-FileSHA1 -Path $jar.FullName
-            if ($hash) {
-                $modrinthData = Query-Modrinth -Hash $hash
-                if ($modrinthData.Slug) {
-                    $this.InvokeUI("log", @("[OK] Verified (Modrinth): $($modrinthData.Name) ($($jar.Name))", "log-ok"))
-                    $verifiedCount++
-                    continue
-                }
-            }
-            
-            # 2. Run Heuristic Checklist matching
-            $matchedArray = New-Object System.Collections.Generic.List[string]
-            foreach ($pattern in $Global:SuspiciousPatternsList) {
-                if ($jar.Name -match $pattern) { $null = $matchedArray.Add($pattern) }
-            }
-
-            if ($matchedArray.Count -gt 0) {
-                $this.InvokeUI("log", @("[!] SUSPICIOUS: $($jar.Name) -> Matched criteria: $($matchedArray -join ', ')", "log-danger"))
-                $suspCount++
-            } else {
-                $this.InvokeUI("log", @("[?] UNKNOWN: $($jar.Name) (Unverified custom layout or client)", "log-warn"))
-                $unknownCount++
-            }
-        }
-
-        # Finish Report formatting output strings
-        $this.InvokeUI("log", @("`n" + ("="*40) + "`nSCAN COMPLETE SUMMARY`n" + ("="*40), "log-info"))
-        $this.InvokeUI("log", @("Verified Secure Mods: $verifiedCount", "log-ok"))
-        $this.InvokeUI("log", @("Flagged Suspicious Items: $suspCount", "log-danger"))
-        $this.InvokeUI("log", @("Unknown/Custom Mods: $unknownCount", "log-warn"))
+    foreach ($jar in $jarFiles) {
+        [System.Windows.Forms.Application]::DoEvents() 
+        &$InvokeUI "log" @("Checking package entry: $($jar.Name)", "log-muted")
         
-        if ($suspCount -gt 0) {
-            $this.InvokeUI("setStatus", @("warn", "Flags Tripped"))
+        $hash = Get-FileSHA1 -Path $jar.FullName
+        if ($hash) {
+            $modrinthData = Query-Modrinth -Hash $hash
+            if ($modrinthData.Slug) {
+                &$InvokeUI "log" @("[OK] Verified (Modrinth): $($modrinthData.Name)", "log-ok")
+                $verifiedCount++
+                continue
+            }
+        }
+        
+        $matchedArray = New-Object System.Collections.Generic.List[string]
+        foreach ($pattern in $SuspiciousPatternsList) {
+            if ($jar.Name -match $pattern) { $null = $matchedArray.Add($pattern) }
+        }
+
+        if ($matchedArray.Count -gt 0) {
+            &$InvokeUI "log" @("[!] SUSPICIOUS: $($jar.Name) -> Matched: $($matchedArray -join ', ')", "log-danger")
+            $suspCount++
         } else {
-            $this.InvokeUI("setStatus", @("done", "Scan Clean"))
+            &$InvokeUI "log" @("[?] UNKNOWN: $($jar.Name)", "log-warn")
+            $unknownCount++
         }
     }
 
-    private void InvokeUI(string functionName, object[] args) {
-        if ($this.browser.Document) {
-            $this.browser.Document.InvokeScript($functionName, $args) | Out-Null
-        }
+    &$InvokeUI "log" @("`n========================================`nSCAN COMPLETE SUMMARY`n========================================", "log-info")
+    &$InvokeUI "log" @("Verified Secure Mods: $verifiedCount", "log-ok")
+    &$InvokeUI "log" @("Flagged Suspicious Items: $suspCount", "log-danger")
+    &$InvokeUI "log" @("Unknown/Custom Mods: $unknownCount", "log-warn")
+    
+    if ($suspCount -gt 0) {
+        &$InvokeUI "setStatus" @("warn", "Flags Tripped")
+    } else {
+        &$InvokeUI "setStatus" @("done", "Scan Clean")
     }
 }
 
-# --- GUI Form Formatter Initialization ---
+# --- GUI Windows Forms Initialization ---
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Mecz Mod Analyzer"
 $form.Width = 800
@@ -309,13 +296,17 @@ $webBrowser.AllowWebBrowserDrop = $false
 $webBrowser.ScriptErrorsSuppressed = $true
 
 $form.Controls.Add($webBrowser)
-
-# Bind Backend Object Bridge Interop to WebBrowser Execution Environment
-$bridge = New-Object WebBridge ($webBrowser)
-$webBrowser.ObjectForScripting = $bridge
 $webBrowser.DocumentText = $htmlMarkup
 
-# Run path auto-detection after the UI fully loads onto the screen
+# Safe Event Hook: Intercept Document title changes to drop native security constraints
+$webBrowser.add_DocumentTitleChanged({
+    if ($webBrowser.DocumentTitle -match "^TRIGGER_SCAN\|(.*)") {
+        $scanPath = $matches[1]
+        $webBrowser.Document.Title = "ModAnalyzer" # reset title
+        Run-ScanOperation -browser $webBrowser -targetedPath $scanPath
+    }
+})
+
 $form.Add_Shown({
     $detection = Resolve-GamePath
     $webBrowser.Document.InvokeScript("setPath", @($detection.Path)) | Out-Null
