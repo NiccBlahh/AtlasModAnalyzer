@@ -6,41 +6,37 @@ Clear-Host
 
  $Banner = @"
 
-      '¦\¯¯¯¯\`        '/¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯\"                   '       '
-     /¯¯¦'\     '\‚     ' ¦:.                                   ·'¦/\¯¯¯¯¯¯\'
-   /      ¦_\      \°   °¦\______/¦:        ¦\______/¦\ '\            \°           °        
-  /      /¦¯¦\      '\  " ¦'¦·::::::::·¦ ¦:.       ¦ ¦·::::::::·¦’¦ '\;|            |'         
- ¦:.     \¦:.¦/        \   '\¦·::::::::·¦/¦:.       ¦\¦':::::::::'¦/'   '|            | '/¯¯¯¯¯¯\
- ¦:.       \,¦:.        ¦    ¯¯¯¯¯ ' /          \ ¯¯¯¯¯´    '/             |/'/|          ··|  
- ¦\_____¦____ /¦              '¦\______/¦’      ''      |\_______/'/______/|  ¦\_____¦____ /¦  
- ¦:¦:::::::::¦::::::::¦`¦              '¦'¦::::::::::'¦'¦’    °        |:|:::::::::::::| |:::::::::::|:|  
-  \¦:::::::::¦::::::::¦/               "\¦::::::::::'¦/´        '     '\|:::::::::::::| |:::::::::::|/´   
-    ¯¯¯¯'°¯¯¯¯’                   ¯¯¯¯¯¯’                 ¯¯¯¯¯¯¯  ¯¯¯¯¯¯’       ¯¯¯¯'°¯¯¯¯’    
+_____    __   .__                          _____               .___
+  /  _  \ _/  |_ |  |  _____     ______      /     \    ____    __| _/
+ /  /_\  \\   __\|  |  \__  \   /  ___/     /  \ /  \  /  _ \  / __ |
+/    |    \|  |  |  |__ / __ \_ \___ \     /    Y    \(  <_> )/ /_/ |
+\____|__  /|__|  |____/(____  //____  >    \____|__  / \____/ \____ |
+        \/                  \/      \/             \/
+
+       _____                   .__
+      /  _  \    ____  _____   |  |  ___.__.________  ____ _______
+     /  /_\  \  /    \ \__  \  |  | <   |  |\___   /_/ __ \\_  __ \
+    /    |    \|   |  \ / __ \_|  |__\___  | /    / \  ___/ |  | \/
+    \____|__  /|___|  /(____  /|____// ____|/_____ \ \___  >|__|
+            \/      \/      \/       \/           \/     \/
 
 "@
 
 Write-Host $Banner -ForegroundColor Magenta
-Write-Host "                Made with " -ForegroundColor Gray -NoNewline
-Write-Host "♥ " -ForegroundColor Red -NoNewline
-Write-Host "by " -ForegroundColor Gray -NoNewline
-Write-Host "@imnicc.dll" -ForegroundColor Magenta -NoNewline
-Write-Host "   love yall " -ForegroundColor Gray -NoNewline
-Write-Host "<3" -ForegroundColor Red
+Write-Host "Made with love by @imnicc.dll , love yall <3" -ForegroundColor Magenta
 Write-Host ""
 Write-Host ("━" * 76) -ForegroundColor DarkCyan
 Write-Host
 
-Write-Host "Enter path to the mods folder: " -NoNewline
-Write-Host "(press Enter to use default)" -ForegroundColor DarkGray
- $modsPath = Read-Host "PATH"
-Write-Host
-
-if ([string]::IsNullOrWhiteSpace($modsPath)) {
+# Automatic Path Detection (No Prompt)
+if ($args.Count -gt 0) {
+    $modsPath = $args[0]
+    Write-Host "Scanning provided path: $modsPath" -ForegroundColor DarkGray
+} else {
     $modsPath = "$env:USERPROFILE\AppData\Roaming\.minecraft\mods"
-    Write-Host "Continuing with " -NoNewline
-    Write-Host $modsPath -ForegroundColor White
-    Write-Host
+    Write-Host "Scanning default path: $modsPath" -ForegroundColor DarkGray
 }
+Write-Host
 
 if (-not (Test-Path $modsPath -PathType Container)) {
     Write-Host
@@ -56,12 +52,11 @@ if (-not (Test-Path $modsPath -PathType Container)) {
     Write-Host " ║" -ForegroundColor Gray
     Write-Host "  ╚═══════════════════════════════════════════════════════════════╝" -ForegroundColor Red
     Write-Host
-    Write-Host "  Press any key to exit..." -ForegroundColor Gray
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    # No pause, exit immediately
     exit 1
 }
 
-Write-Host "📁 Scanning directory: $modsPath" -ForegroundColor Green
+Write-Host "📁 Directory valid." -ForegroundColor Green
 Write-Host
 
  $mcProcess = Get-Process javaw -ErrorAction SilentlyContinue
