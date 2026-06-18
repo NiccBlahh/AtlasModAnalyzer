@@ -6,27 +6,16 @@ Clear-Host
 
  $Banner = @"
 
-   █████████    █████    ████                       ██████   ██████              █████
-  ███░░░░░███  ░░███    ░░███                      ░░██████ ██████              ░░███
- ░███    ░███  ███████   ░███   ██████    █████     ░███░█████░███   ██████   ███████
- ░███████████ ░░░███░    ░███  ░░░░░███  ███░░      ░███░░███ ░███  ███░░███ ███░░███
- ░███░░░░░███   ░███     ░███   ███████ ░░█████     ░███ ░░░  ░███ ░███ ░███░███ ░███
- ░███    ░███   ░███ ███ ░███  ███░░███  ░░░░███    ░███      ░███ ░███ ░███░███ ░███
- █████   █████  ░░█████  █████░░████████ ██████     █████     █████░░██████ ░░████████
-░░░░░   ░░░░░    ░░░░░  ░░░░░  ░░░░░░░░ ░░░░░░     ░░░░░     ░░░░░  ░░░░░░   ░░░░░░░░
-
-
-                        █████████                        ████
-                       ███░░░░░███                      ░░███
-                      ░███    ░███  ████████    ██████   ░███  █████ ████  █████████  ██████  ████████
-                      ░███████████ ░░███░░███  ░░░░░███  ░███ ░░███ ░███  ░█░░░░███  ███░░███░░███░░███
-                      ░███░░░░░███  ░███ ░███   ███████  ░███  ░███ ░███  ░   ███░  ░███████  ░███ ░░░
-                      ░███    ░███  ░███ ░███  ███░░███  ░███  ░███ ░███    ███░   █░███░░░   ░███
-                      █████   █████ ████ █████░░████████ █████ ░░███████   █████████░░██████  █████
-                     ░░░░░   ░░░░░ ░░░░ ░░░░░  ░░░░░░░░ ░░░░░   ░░░░░███  ░░░░░░░░  ░░░░░░  ░░░░░
-                                                                ███ ░███
-                                                               ░░██████
-                                                                ░░░░░░
+      '¦\¯¯¯¯\`        '/¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯\"                   '       '
+     /¯¯¦'\     '\‚     ' ¦:.                                   ·'¦/\¯¯¯¯¯¯\'
+   /      ¦_\      \°   °¦\______/¦:        ¦\______/¦\ '\            \°           °        
+  /      /¦¯¦\      '\  " ¦'¦·::::::::·¦ ¦:.       ¦ ¦·::::::::·¦’¦ '\;|            |'         
+ ¦:.     \¦:.¦/        \   '\¦·::::::::·¦/¦:.       ¦\¦':::::::::'¦/'   '|            | '/¯¯¯¯¯¯\
+ ¦:.       \,¦:.        ¦    ¯¯¯¯¯ ' /          \ ¯¯¯¯¯´    '/             |/'/|          ··|  
+ ¦\_____¦____ /¦              '¦\______/¦’      ''      |\_______/'/______/|  ¦\_____¦____ /¦  
+ ¦:¦:::::::::¦::::::::¦`¦              '¦'¦::::::::::'¦'¦’    °        |:|:::::::::::::| |:::::::::::|:|  
+  \¦:::::::::¦::::::::¦/               "\¦::::::::::'¦/´        '     '\|:::::::::::::| |:::::::::::|/´   
+    ¯¯¯¯'°¯¯¯¯’                   ¯¯¯¯¯¯’                 ¯¯¯¯¯¯¯  ¯¯¯¯¯¯’       ¯¯¯¯'°¯¯¯¯’    
 
 "@
 
@@ -79,20 +68,9 @@ Write-Host
 if (-not $mcProcess) { $mcProcess = Get-Process java -ErrorAction SilentlyContinue }
 if ($mcProcess) {
     try {
-        $startTime = $mcProcess.StartTime
-        $uptime    = (Get-Date) - $startTime
-        Write-Host
-        Write-Host "  ┌────────────────────────────────────────────────────────────┐" -ForegroundColor DarkCyan
-        Write-Host "  │  🎮 PROCESS DETECTED                                     │" -ForegroundColor White
-        Write-Host "  ├────────────────────────────────────────────────────────────┤" -ForegroundColor DarkCyan
-        Write-Host ("  │  Name      : " + $mcProcess.Name.PadRight(40)) -NoNewline -ForegroundColor DarkCyan
-        Write-Host "│" -ForegroundColor DarkCyan
-        Write-Host ("  │  PID       : " + $mcProcess.Id.ToString().PadRight(40)) -NoNewline -ForegroundColor DarkCyan
-        Write-Host "│" -ForegroundColor DarkCyan
-        Write-Host ("  │  Uptime    : " + "$($uptime.Hours)h $($uptime.Minutes)m $($uptime.Seconds)s".PadRight(40)) -NoNewline -ForegroundColor DarkCyan
-        Write-Host "│" -ForegroundColor DarkCyan
-        Write-Host "  └────────────────────────────────────────────────────────────┘" -ForegroundColor DarkCyan
-        Write-Host
+        $elapsed = (Get-Date) - $mcProcess.StartTime
+        $uptimeStr = "$($elapsed.Hours)h $($elapsed.Minutes)m $($elapsed.Seconds)s"
+        Write-Host "Javaw Found , PID : $($mcProcess.Id) , Uptime : $uptimeStr" -ForegroundColor DarkCyan
     } catch { }
 }
 
@@ -689,9 +667,9 @@ if ($verifiedMods.Count -gt 0) {
     Write-SectionHeader -Title "VERIFIED MODS" -Count $verifiedMods.Count -DotColor Green -CountColor Green
     Write-Rule "─" 76 DarkGray
     foreach ($mod in $verifiedMods) {
-        Write-Host "  ✓ " -ForegroundColor Green -NoNewline
+        Write-Host "  " -NoNewline
         Write-Host "$($mod.ModName)" -ForegroundColor White -NoNewline
-        Write-Host " → " -ForegroundColor Gray -NoNewline
+        Write-Host " :: " -ForegroundColor Gray -NoNewline
         Write-Host "$($mod.FileName)" -ForegroundColor DarkGray
     }
     Write-Host ""
