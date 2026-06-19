@@ -58,24 +58,7 @@ Unrecognized JARs are opened as zip archives. The following are extracted and sc
 
 ---
 
-### Phase 3 — Bypass & Injection Detection
-
-Structural analysis performed on every mod to detect dangerous or deceptive behavior:
-
-| Check | Description |
-|---|---|
-| Suspicious nested JARs | Unknown dependencies bundled without version info |
-| Hollow shell mods | Minimal outer classes wrapping a single inner JAR |
-| `Runtime.exec()` | Arbitrary OS command execution capability |
-| HTTP file download | Fetches and writes remote files to disk at runtime |
-| HTTP POST exfiltration | Transmits system data (e.g. properties, tokens) to external servers |
-| Heavy obfuscation | Statistically abnormal ratio of single-letter path segments |
-| Numeric / Unicode class names | Automated obfuscator output patterns |
-| Fake mod identity | Claims to be `sodium`, `lithium`, etc. but contains malicious code |
-
----
-
-### Phase 4 — Obfuscation Analysis
+### Phase 3 — Obfuscation Analysis
 
 Deep inspection of class naming conventions across the entire JAR:
 
@@ -93,7 +76,7 @@ Deep inspection of class naming conventions across the entire JAR:
 
 ---
 
-### Phase 5 — JVM Argument Audit
+### Phase 4 — JVM Argument Audit
 
 If Minecraft is running when the script starts, the live Java process arguments are inspected for:
 
