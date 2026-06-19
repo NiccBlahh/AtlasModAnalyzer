@@ -9,8 +9,6 @@
 powershell -ExecutionPolicy Bypass -Command "Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/NiccBlahh/AtlasModAnalyzer/refs/heads/main/ModAnalyzer.ps1')"
 ```
 
-Start Minecraft **first**, then run the script. It automatically detects your active instance via the Java process command line (`--gameDir`). Press **Enter** to confirm, or type a custom path instead.
-
 ---
 
 ## Output Labels
