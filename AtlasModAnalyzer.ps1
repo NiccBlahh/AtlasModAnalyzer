@@ -21,7 +21,7 @@ Clear-Host
 "@
 Write-Host $Banner -ForegroundColor Magenta
 Write-Host "          made by " -NoNewline -ForegroundColor DarkGray
-Write-Host "@imnicc.dll" -NoNewline -ForegroundColor Cyan
+Write-Host "@imnicc.dll & @luvtryserve" -NoNewline -ForegroundColor Cyan
 Write-Host " , " -NoNewline -ForegroundColor DarkGray
 Write-Host "love yall" -NoNewline -ForegroundColor Magenta
 Write-Host " :3" -ForegroundColor DarkGray
