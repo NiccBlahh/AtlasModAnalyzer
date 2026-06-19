@@ -1,10 +1,10 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding  = [System.Text.Encoding]::UTF8
-$OutputEncoding           = [System.Text.Encoding]::UTF8
+ $OutputEncoding           = [System.Text.Encoding]::UTF8
 chcp 65001 | Out-Null
 Clear-Host
 
-$Banner = @"
+ $Banner = @"
  █████╗ ████████╗██╗      █████╗ ███████╗    ███╗   ███╗ ██████╗ ██████╗    
 ██╔══██╗╚══██╔══╝██║     ██╔══██╗██╔════╝    ████╗ ████║██╔═══██╗██╔══██╗   
 ███████║   ██║   ██║     ███████║███████╗    ██╔████╔██║██║   ██║██║  ██║   
@@ -30,7 +30,7 @@ Write-Host ""
 # ---------- PATH INPUT ----------
 Write-Host "Enter path to the mods folder: " -NoNewline
 Write-Host "(press Enter to use default)" -ForegroundColor DarkGray
-$modsPath = Read-Host "PATH"
+ $modsPath = Read-Host "PATH"
 Write-Host ""
 
 if ([string]::IsNullOrWhiteSpace($modsPath)) {
@@ -57,7 +57,7 @@ Write-Host "  [+] Path valid." -ForegroundColor Green
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 # ---------- HIDDEN MODS DETECTION ----------
-$hiddenMods = Get-ChildItem -Path $modsPath -Filter *.jar -Force | Where-Object { $_.Attributes -band [System.IO.FileAttributes]::Hidden }
+ $hiddenMods = Get-ChildItem -Path $modsPath -Filter *.jar -Force | Where-Object { $_.Attributes -band [System.IO.FileAttributes]::Hidden }
 if ($hiddenMods) {
     Write-Host "  [!] Hidden mods detected:" -ForegroundColor Red
     foreach ($hm in $hiddenMods) {
@@ -77,7 +77,7 @@ if ($hiddenMods) {
 }
 
 # ---------- JVM PROCESS CHECK ----------
-$mcProcess = Get-Process javaw -ErrorAction SilentlyContinue
+ $mcProcess = Get-Process javaw -ErrorAction SilentlyContinue
 if (-not $mcProcess) { $mcProcess = Get-Process java -ErrorAction SilentlyContinue }
 if ($mcProcess) {
     try {
@@ -89,7 +89,7 @@ if ($mcProcess) {
 }
 
 # ---------- PATTERN LISTS ----------
-$suspiciousPatterns = @(
+ $suspiciousPatterns = @(
     "AimAssist","AnchorTweaks","AutoAnchor","AutoCrystal","AutoDoubleHand","JDWP.VirtualMachine.AllModules",
     "AutoHitCrystal","AutoPot","AutoTotem","AutoArmor","InventoryTotem",
     "LegitTotem","PingSpoof","SelfDestruct","ShieldBreaker","TriggerBot","AxeSpam","WebMacro",
@@ -112,7 +112,7 @@ $suspiciousPatterns = @(
     "ClientPlayerEntityMixim","dev.gambleclient","obfuscatedAuth","phantom-refmap.json","xyz.greaj"
 )
 
-$cheatStrings = @(
+ $cheatStrings = @(
     "AutoCrystal","autocrystal","auto crystal","cw crystal","JDWP.VirtualMachine.AllModules",
     "dontPlaceCrystal","dontBreakCrystal","AutoHitCrystal","autohitcrystal","canPlaceCrystalServer",
     "healPotSlot","AutoAnchor","autoanchor","auto anchor","DoubleAnchor","HasAnchor","anchortweaks","anchor macro",
@@ -148,25 +148,17 @@ $cheatStrings = @(
     "phantom-refmap.json","dqrkis.xyz","Dqrkis Client"
 )
 
-$fullwidthRegex = [regex]::new("[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}", [System.Text.RegularExpressions.RegexOptions]::Compiled)
+ $fullwidthRegex = [regex]::new("[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}", [System.Text.RegularExpressions.RegexOptions]::Compiled)
 
-$patternRegex = [regex]::new(
+ $patternRegex = [regex]::new(
     '(?<![A-Za-z])(' + ($suspiciousPatterns -join '|') + ')(?![A-Za-z])',
     [System.Text.RegularExpressions.RegexOptions]::Compiled
 )
 
-$cheatStringSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+ $cheatStringSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 foreach ($s in $cheatStrings) { [void]$cheatStringSet.Add($s) }
 
-$modrinthWhitelistedSlugs = @("viafabricplus","viafabricversion")
-
-# ---------- FORENSIC TOOL SETUP ----------
-$pecmdUrl = "https://github.com/NoDiff-del/JARs/releases/download/Jar/PECmd.exe"
-$xxstringsUrl = "https://github.com/NoDiff-del/JARs/releases/download/Jar/xxstrings64.exe"
-$pecmdPath = "$env:TEMP\PECmd.exe"
-$xxstringsPath = "$env:TEMP\xxstrings64.exe"
-Invoke-WebRequest -Uri $pecmdUrl -OutFile $pecmdPath -ErrorAction SilentlyContinue
-Invoke-WebRequest -Uri $xxstringsUrl -OutFile $xxstringsPath -ErrorAction SilentlyContinue
+ $modrinthWhitelistedSlugs = @("viafabricplus","viafabricversion")
 
 # ---------- HELPER FUNCTIONS ----------
 function Get-FileSHA1 {
@@ -365,8 +357,8 @@ function Invoke-ObfuscationScan {
         if ($s1Pct   -ge 15) { $flags.Add("Single-letter class names - $s1Pct% ($singleLetterCount classes)") }
         if ($s2Pct   -ge 20) { $flags.Add("Two-letter class names - $s2Pct% ($twoLetterCount classes)") }
         if ($gibPct  -ge  5) { $flags.Add("Gibberish class names - $gibPct% have no vowels/consonant clusters ($gibberishCount classes)") }
-        if ($novPct  -ge  8) { $flags.Add("No-vowel class names - $novPct% ($noVowelCount classes)") }
-        if ($confPct -ge  3) { $flags.Add("Confusion-char names (Il1O0/_) - $confPct% ($confCount classes)") }
+        if ($novPct  -ge 8) { $flags.Add("No-vowel class names - $novPct% ($noVowelCount classes)") }
+        if ($confPct -ge 3) { $flags.Add("Confusion-char names (Il1O0/_) - $confPct% ($confCount classes)") }
         if ($singleCharPkg -ge 6) { $flags.Add("Single-char package paths - $singleCharPkg path segments like a/b/c") }
         $fwStringMatches = [regex]::Matches($contentSample.ToString(), "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}")
         if ($fwStringMatches.Count -gt 0) {
@@ -576,85 +568,10 @@ function Write-ObfuscationCard {
     Write-Host ""
 }
 
-# ---------- FORENSIC PREFETCH ----------
-function Invoke-ForensicScan {
-    $logonTime = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
-    $prefetchFolder = "C:\Windows\Prefetch"
-
-    Write-Host ""
-    Write-Host "  FORENSIC PREFETCH SCAN" -ForegroundColor White
-    Write-Host ""
-
-    # --- Detect deleted prefetch ---
-    Write-Host "  [+] Checking for deleted prefetch evidence..." -ForegroundColor Gray
-    $evidenceFound = $false
-
-    # Method 1: Event logs
-    try {
-        $events = Get-WinEvent -LogName Security -MaxEvents 100 -ErrorAction SilentlyContinue |
-            Where-Object { ($_.Id -eq 4660) -and $_.Message -match "Prefetch.*\.pf" -and $_.TimeCreated -gt $logonTime }
-        if ($events.Count -gt 0) {
-            Write-Host "  [!] Deletion events in Security log:" -ForegroundColor Red
-            foreach ($ev in ($events | Select-Object -First 2)) { Write-Host "       $($ev.TimeCreated)  ID:$($ev.Id)" -ForegroundColor Yellow }
-            $evidenceFound = $true
-        }
-    } catch {}
-
-    # Method 2: USN Journal
-    try {
-        $usnData = fsutil usn readjournal C: 2>$null | Select-String "\.pf" | Select-String "DELETE"
-        if ($usnData) {
-            Write-Host "  [!] .pf deletion records in USN Journal" -ForegroundColor Red
-            $evidenceFound = $true
-        }
-    } catch {}
-
-    # Method 3: Missing prefetch files
-    try {
-        $existingPF = Get-ChildItem "$prefetchFolder\*.pf" -ErrorAction SilentlyContinue | ForEach-Object { $_.BaseName.Split('-')[0] }
-        $missing = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match "java|javaw" } | ForEach-Object { $_.ProcessName } |
-            Where-Object { $_ -notin $existingPF }
-        if ($missing) {
-            Write-Host "  [!] Missing prefetch for running processes:" -ForegroundColor Red
-            $missing | Select-Object -Unique | ForEach-Object { Write-Host "       $_" -ForegroundColor Yellow }
-            $evidenceFound = $true
-        }
-    } catch {}
-
-    # Method 4: Check for clearing commands in PS history
-    try {
-        $histPath = "$env:APPDATA\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"
-        if (Test-Path $histPath) {
-            $clearingCmds = Get-Content $histPath -Tail 200 -ErrorAction SilentlyContinue | Select-String "del.*prefetch|clear.*prefetch|remove.*\.pf"
-            if ($clearingCmds) {
-                Write-Host "  [!] Prefetch clearing commands in history:" -ForegroundColor Red
-                $clearingCmds | ForEach-Object { Write-Host "       $_" -ForegroundColor Yellow }
-                $evidenceFound = $true
-            }
-        }
-    } catch {}
-
-    if (-not $evidenceFound) { Write-Host "  [+] No evidence of deleted prefetch files" -ForegroundColor Green }
-
-    # --- Check DcomLaunch memory ---
-    Write-Host ""
-    Write-Host "  [+] Checking DcomLaunch memory for Java args..." -ForegroundColor Gray
-    if (Test-Path $xxstringsPath) {
-        try {
-            $pid = (Get-CimInstance Win32_Service | Where-Object { $_.Name -eq 'DcomLaunch' }).ProcessId
-            $memOut = & $xxstringsPath -p $pid -raw 2>$null | Select-String "-jar"
-            if ($memOut) { Write-Host "  [!] '-jar' found in DcomLaunch:" -ForegroundColor Yellow; $memOut | ForEach-Object { Write-Host "       $_" -ForegroundColor Gray } }
-            else { Write-Host "  [+] No '-jar' in DcomLaunch" -ForegroundColor Green }
-        } catch { Write-Host "  [!] Could not read DcomLaunch (admin required)" -ForegroundColor DarkYellow }
-    } else { Write-Host "  [!] xxstrings64.exe not downloaded" -ForegroundColor DarkYellow }
-
-    Write-Host ""
-}
-
 # ---------- NORMAL SCAN ----------
 Write-Host "  NORMAL SCAN" -ForegroundColor White
 
-$verifiedMods=@(); $unknownMods=@(); $suspiciousMods=@(); $obfuscatedMods=@()
+ $verifiedMods=@(); $unknownMods=@(); $suspiciousMods=@(); $obfuscatedMods=@()
 
 try {
     $jarFiles = Get-ChildItem -Path $modsPath -Filter *.jar -ErrorAction Stop
@@ -670,13 +587,13 @@ if ($jarFiles.Count -eq 0) {
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown"); exit 0
 }
 
-$fileWord = if ($jarFiles.Count -eq 1) { "file" } else { "files" }
+ $fileWord = if ($jarFiles.Count -eq 1) { "file" } else { "files" }
 Write-Host "  [+] Found $($jarFiles.Count) JAR $fileWord to analyze" -ForegroundColor Green
 Write-Host ""
 
-$spinnerFrames = @("|","/","-","\")
-$totalFiles    = $jarFiles.Count
-$idx           = 0
+ $spinnerFrames = @("|","/","-","\")
+ $totalFiles    = $jarFiles.Count
+ $idx           = 0
 
 foreach ($jar in $jarFiles) {
     $idx++
@@ -716,11 +633,8 @@ Write-Host ""
 # --- JVM Arguments Scanner (runs immediately) ---
 Invoke-JvmScan
 
-# --- Forensic Prefetch Scan ---
-Invoke-ForensicScan
-
 # --- Mod Scanner: Content Scan ---
-$idx = 0
+ $idx = 0
 foreach ($jar in $jarFiles) {
     $idx++
     $spinner = $spinnerFrames[$idx % $spinnerFrames.Length]
@@ -749,7 +663,7 @@ foreach ($jar in $jarFiles) {
 Write-Host "`r$(' '*100)`r" -NoNewline
 
 # --- Mod Scanner: Obfuscation Scan ---
-$idx = 0
+ $idx = 0
 foreach ($jar in $jarFiles) {
     $idx++
     $spinner = $spinnerFrames[$idx % $spinnerFrames.Length]
@@ -836,4 +750,4 @@ Write-Host ""
 Write-Host "  Scan complete." -ForegroundColor Green
 Write-Host "  github : NiccBlahh" -ForegroundColor Cyan
 Write-Host "  Press any key to exit..." -ForegroundColor Gray
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+ $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
