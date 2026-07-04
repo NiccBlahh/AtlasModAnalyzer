@@ -108,8 +108,14 @@ $rtbOutput = $Form.FindName("rtbOutput")
 $lblStatus = $Form.FindName("lblStatus")
 $flowDoc = $Form.FindName("flowDoc")
 
+$global:stopScan = $false
+$Form.Add_Closing({
+    $global:stopScan = $true
+})
+
 function Append-Log {
     param([string]$text, [string]$color="#CCCCCC", [switch]$Bold)
+    if ($global:stopScan) { return }
     $brush = (New-Object System.Windows.Media.BrushConverter).ConvertFromString($color)
     $run = New-Object System.Windows.Documents.Run($text + "`r`n")
     $run.Foreground = $brush
@@ -699,10 +705,11 @@ function Invoke-JvmScan {
     $cheatClients = @('Wurst','Aristois','Impact','Kilo','Future','Lambda','Rusher','Konas','Phobos','Salhack','ForgeHax','Mathax','Meteor','Async','Seppuku','Xatz','Wolfram','Huzuni','Jigsaw','Zamorozka','Moon','Rage','Exhibition','Virtue','Novoline','Rekt','Skid','Ares','Abyss','Thunder','Tenacity','Rise','Flux','Gamesense','Intent','Remix','Sight','Vape','Shield','Ghost','Crispy','Inertia')
 
     foreach ($proc in $javaProcesses) {
+        if ($global:stopScan) { return }
         try {
             $cmdLine = (Get-WmiObject Win32_Process -Filter "ProcessId = $($proc.Id)" -ErrorAction Stop).CommandLine
             if (-not $cmdLine) { continue }
-            Append-Log "  +- Process: PID $($proc.Id)" "#00FF00"
+            Append-Log "  +- Process: PID $($proc.Id)" "#81C784"
 
             $detectedPatterns = @()
             foreach ($k in $fabricPatterns.Keys) {
@@ -718,55 +725,54 @@ function Invoke-JvmScan {
 
             if ($detectedPatterns.Count -gt 0) {
                 $foundInjection = $true
-                Append-Log "  |  [!] JVM INJECTION DETECTED!" "#FF0000" -Bold
-                foreach ($d in $detectedPatterns) { Append-Log "  |    - $d" "#FF00FF" }
+                Append-Log "  |  [!] JVM INJECTION DETECTED!" "#E53935" -Bold
+                foreach ($d in $detectedPatterns) { Append-Log "  |    - $d" "#EF5350" }
             } else {
-                Append-Log "  |  [v] No JVM injection patterns detected." "#00FF00"
+                Append-Log "  |  [v] No JVM injection patterns detected." "#81C784"
             }
         } catch {
-            Append-Log "  |  [!] Could not retrieve cmdline. Run as Admin." "#FFaa00"
+            Append-Log "  |  [!] Could not retrieve cmdline. Run as Admin." "#FFB74D"
         }
     }
 }
 
 # --- BUTTON CLICK HANDLER ---
 $btnScan.Add_Click({
+    $global:stopScan = $false
     $btnScan.IsEnabled = $false
     $rtbOutput.Document.Blocks.Clear()
     $lblStatus.Text = "Scanning..."
     
-    Append-Log "========================================" "#FF00FF" -Bold
-    Append-Log " ATLAS MOD ANALYZER SCAN STARTED" "#00FFFF" -Bold
+    Append-Log " ATLAS MOD ANALYZER SCAN STARTED" "#64B5F6" -Bold
     Append-Log " Target: $($txtPath.Text)" "#AAAAAA"
-    Append-Log "========================================" "#FF00FF" -Bold
-    
     if (-not (Test-Path $txtPath.Text -PathType Container)) {
-        Append-Log "[!] Directory does not exist!" "#FF0000" -Bold
+        Append-Log "[!] Directory does not exist!" "#E53935" -Bold
         $btnScan.IsEnabled = $true
         $lblStatus.Text = "Idle."
         return
     }
 
     try { $jarFiles = Get-ChildItem -Path $txtPath.Text -Filter *.jar -ErrorAction Stop } catch {
-        Append-Log "[!] Error accessing directory." "#FF0000"
+        Append-Log "[!] Error accessing directory." "#E53935"
         $btnScan.IsEnabled = $true
         return
     }
 
     if ($jarFiles.Count -eq 0) {
-        Append-Log "[!] No JAR files found." "#FFaa00"
+        Append-Log "[!] No JAR files found." "#FFB74D"
         $btnScan.IsEnabled = $true
         $lblStatus.Text = "Idle."
         return
     }
 
     $total = $jarFiles.Count
-    Append-Log "Found $total JAR files to analyze.`r`n" "#00FF00"
+    Append-Log "Found $total JAR files to analyze.`r`n" "#81C784"
 
     $flaggedCount = 0
     $obfCount = 0
 
     for ($i = 0; $i -lt $total; $i++) {
+        if ($global:stopScan) { return }
         $jar = $jarFiles[$i]
         $lblStatus.Text = "Scanning ($($i+1)/$total): $($jar.Name)"
         [System.Windows.Forms.Application]::DoEvents()
@@ -779,31 +785,29 @@ $btnScan.Add_Click({
         
         if ($isFlagged) {
             $flaggedCount++
-            Append-Log " [FLAGGED] $($jar.Name)" "#FF0000" -Bold
-            foreach ($p in $modRes.Patterns) { Append-Log "    Pattern: $p" "#FF5555" }
-            foreach ($s in $modRes.Strings) { Append-Log "    String: $s" "#FFAA00" }
-            foreach ($f in $modRes.Fullwidth) { Append-Log "    Fullwidth: $f" "#FF00FF" }
+            Append-Log " [FLAGGED] $($jar.Name)" "#E53935" -Bold
+            foreach ($p in $modRes.Patterns) { Append-Log "    Pattern: $p" "#EF5350" }
+            foreach ($s in $modRes.Strings) { Append-Log "    String: $s" "#FFB74D" }
+            foreach ($f in $modRes.Fullwidth) { Append-Log "    Fullwidth: $f" "#9E9E9E" }
             Append-Log ""
         }
         
         if ($isObfuscated) {
             $obfCount++
-            Append-Log " [OBFUSCATED] $($jar.Name)" "#FFFF00" -Bold
+            Append-Log " [OBFUSCATED] $($jar.Name)" "#FFF176" -Bold
             foreach ($o in $obfRes) { Append-Log "    Flag: $o" "#AAAAAA" }
             Append-Log ""
         }
     }
 
-    Append-Log "----------------------------------------" "#FF00FF"
-    Append-Log " JVM PROCESS SCAN" "#00FFFF" -Bold
+    Append-Log " JVM PROCESS SCAN" "#64B5F6" -Bold
     Invoke-JvmScan
     
-    Append-Log "----------------------------------------" "#FF00FF"
-    Append-Log " SCAN COMPLETE!" "#00FF00" -Bold
+    if ($global:stopScan) { return }
+    Append-Log " SCAN COMPLETE!" "#81C784" -Bold
     Append-Log " Total Scanned: $total" "#FFFFFF"
-    Append-Log " Flagged Mods:  $flaggedCount" "#FF0000"
-    Append-Log " Obfuscated:    $obfCount" "#FFFF00"
-    Append-Log "========================================" "#FF00FF" -Bold
+    Append-Log " Flagged Mods:  $flaggedCount" "#E53935"
+    Append-Log " Obfuscated:    $obfCount" "#FFF176"
 
     $lblStatus.Text = "Scan Complete."
     $btnScan.IsEnabled = $true
