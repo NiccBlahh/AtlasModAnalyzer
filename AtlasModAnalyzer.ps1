@@ -5,77 +5,130 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Atlas Mod Analyzer" Height="700" Width="1000" Background="#0C0C0C" WindowStartupLocation="CenterScreen">
+        Title="Atlas Mod Analyzer" Height="700" Width="1000" WindowStartupLocation="CenterScreen"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent">
     <Window.Resources>
         <Style TargetType="Button">
-            <Setter Property="Background" Value="#1E1E1E"/>
             <Setter Property="Foreground" Value="#00FFFF"/>
-            <Setter Property="BorderBrush" Value="#FF00FF"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="15,5"/>
-            <Setter Property="Margin" Value="5"/>
             <Setter Property="FontFamily" Value="Consolas"/>
             <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="6" BorderThickness="1" BorderBrush="#00FFFF" Background="#111111" Name="BtnBorder">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20,10"/>
+                            <Border.Effect>
+                                <DropShadowEffect Color="#FF00FF" BlurRadius="8" ShadowDepth="0" Opacity="0.6"/>
+                            </Border.Effect>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#222222"/>
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="#FF00FF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="#000000"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="TitleBarBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#888888"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#2A2A2A"/>
+                    <Setter Property="Foreground" Value="#FF5555"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#1A1A1A"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="BorderBrush" Value="#333333"/>
-            <Setter Property="FontFamily" Value="Consolas"/>
-            <Setter Property="Margin" Value="5"/>
-            <Setter Property="Padding" Value="8"/>
-        </Style>
     </Window.Resources>
-    <Grid Margin="15">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-        
-        <TextBlock Text="ATLAS MOD ANALYZER" Grid.Row="0" Foreground="#FF00FF" FontSize="28" FontWeight="Bold" FontFamily="Consolas" HorizontalAlignment="Center" Margin="0,0,0,15"/>
-        
-        <Grid Grid.Row="1" Margin="0,0,0,10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="Mods Path:" Grid.Column="0" Foreground="#CCCCCC" FontFamily="Consolas" VerticalAlignment="Center" Margin="5"/>
-            <TextBox Name="txtPath" Grid.Column="1" Text="$env:USERPROFILE\AppData\Roaming\.minecraft\mods"/>
-            <Button Name="btnBrowse" Grid.Column="2" Content="Browse..."/>
-            <Button Name="btnScan" Grid.Column="3" Content="START SCAN" Foreground="#FF00FF" BorderBrush="#00FFFF"/>
-        </Grid>
 
-        <RichTextBox Name="rtbOutput" Grid.Row="2" Background="#111111" Foreground="#CCCCCC" FontFamily="Consolas" Margin="5" IsReadOnly="True" VerticalScrollBarVisibility="Auto">
-            <FlowDocument Name="flowDoc">
-                <Paragraph Margin="0">
-                    <Run Text="Ready to scan. Select a folder and click START SCAN." Foreground="#00FFFF"/>
-                </Paragraph>
-            </FlowDocument>
-        </RichTextBox>
-        
-        <TextBlock Name="lblStatus" Grid.Row="3" Text="Idle." Foreground="#888888" FontFamily="Consolas" Margin="5,5,0,0"/>
-    </Grid>
+    <Border CornerRadius="12" BorderThickness="1" BorderBrush="#330033" Background="#080510">
+        <Border.Effect>
+            <DropShadowEffect Color="#FF00FF" BlurRadius="25" ShadowDepth="0" Opacity="0.4"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="45"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Title Bar -->
+            <Border Name="titleBar" Grid.Row="0" Background="#0F081C" CornerRadius="12,12,0,0">
+                <Grid>
+                    <TextBlock Text="ATLAS MOD ANALYZER" Foreground="#FF00FF" FontFamily="Consolas" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" Margin="20,0,0,0">
+                        <TextBlock.Effect>
+                            <DropShadowEffect Color="#FF00FF" BlurRadius="10" ShadowDepth="0"/>
+                        </TextBlock.Effect>
+                    </TextBlock>
+                    <Button Name="btnClose" Style="{StaticResource TitleBarBtn}" Content="✕" Width="50" FontSize="18" FontWeight="Bold" HorizontalAlignment="Right"/>
+                </Grid>
+            </Border>
+            
+            <Grid Grid.Row="1" Margin="20,15,20,15">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Mods Path:" Grid.Column="0" Foreground="#CCCCCC" FontFamily="Consolas" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <Border Grid.Column="1" CornerRadius="6" Background="#15101C" BorderBrush="#333333" BorderThickness="1" Margin="0,0,10,0">
+                    <TextBox Name="txtPath" Background="Transparent" Foreground="#FFFFFF" BorderThickness="0" FontFamily="Consolas" FontSize="14" Margin="5" VerticalAlignment="Center" Text="$env:USERPROFILE\AppData\Roaming\.minecraft\mods"/>
+                </Border>
+                <Button Name="btnBrowse" Grid.Column="2" Content="BROWSE" Margin="0,0,10,0"/>
+                <Button Name="btnScan" Grid.Column="3" Content="START SCAN" Foreground="#FF00FF"/>
+            </Grid>
+
+            <Border Grid.Row="2" Margin="20,0,20,10" CornerRadius="8" BorderThickness="1" BorderBrush="#1A1A1A" Background="#040208">
+                <RichTextBox Name="rtbOutput" Background="Transparent" BorderThickness="0" Foreground="#CCCCCC" FontFamily="Consolas" FontSize="13" Margin="10" IsReadOnly="True" VerticalScrollBarVisibility="Auto">
+                    <FlowDocument Name="flowDoc">
+                        <Paragraph Margin="0">
+                            <Run Text="System initialized. Ready to scan..." Foreground="#00FFFF"/>
+                        </Paragraph>
+                    </FlowDocument>
+                </RichTextBox>
+            </Border>
+            
+            <TextBlock Name="lblStatus" Grid.Row="3" Text="Idle." Foreground="#666666" FontFamily="Consolas" Margin="20,0,0,15"/>
+        </Grid>
+    </Border>
 </Window>
 "@
 
 $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $Form = [Windows.Markup.XamlReader]::Load($reader)
 
+$titleBar = $Form.FindName("titleBar")
+$btnClose = $Form.FindName("btnClose")
 $txtPath = $Form.FindName("txtPath")
 $btnBrowse = $Form.FindName("btnBrowse")
 $btnScan = $Form.FindName("btnScan")
 $rtbOutput = $Form.FindName("rtbOutput")
 $lblStatus = $Form.FindName("lblStatus")
 $flowDoc = $Form.FindName("flowDoc")
+
+$titleBar.Add_MouseLeftButtonDown({
+    $Form.DragMove()
+})
+
+$btnClose.Add_Click({
+    $Form.Close()
+})
 
 function Append-Log {
     param([string]$text, [string]$color="#CCCCCC", [switch]$Bold)
