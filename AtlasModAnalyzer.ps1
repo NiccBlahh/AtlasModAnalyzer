@@ -116,15 +116,19 @@ $Form.Add_Closing({
 function Append-Log {
     param([string]$text, [string]$color="#CCCCCC", [switch]$Bold)
     if ($global:stopScan) { return }
-    $brush = (New-Object System.Windows.Media.BrushConverter).ConvertFromString($color)
-    $run = New-Object System.Windows.Documents.Run($text + "`r`n")
-    $run.Foreground = $brush
-    if ($Bold) { $run.FontWeight = [System.Windows.FontWeights]::Bold }
-    $paragraph = New-Object System.Windows.Documents.Paragraph($run)
-    $paragraph.Margin = New-Object System.Windows.Thickness(0)
-    $flowDoc.Blocks.Add($paragraph)
-    $rtbOutput.ScrollToEnd()
-    [System.Windows.Forms.Application]::DoEvents()
+    try {
+        $brush = (New-Object System.Windows.Media.BrushConverter).ConvertFromString($color)
+        $run = New-Object System.Windows.Documents.Run($text + "`r`n")
+        $run.Foreground = $brush
+        if ($Bold) { $run.FontWeight = [System.Windows.FontWeights]::Bold }
+        $paragraph = New-Object System.Windows.Documents.Paragraph($run)
+        $paragraph.Margin = New-Object System.Windows.Thickness(0)
+        $flowDoc.Blocks.Add($paragraph)
+        $rtbOutput.ScrollToEnd()
+        [System.Windows.Forms.Application]::DoEvents()
+    } catch {
+        $global:stopScan = $true
+    }
 }
 
 $btnBrowse.Add_Click({
@@ -774,8 +778,16 @@ $btnScan.Add_Click({
     for ($i = 0; $i -lt $total; $i++) {
         if ($global:stopScan) { return }
         $jar = $jarFiles[$i]
-        $lblStatus.Text = "Scanning ($($i+1)/$total): $($jar.Name)"
-        [System.Windows.Forms.Application]::DoEvents()
+        
+        try {
+            $lblStatus.Text = "Scanning ($($i+1)/$total): $($jar.Name)"
+            [System.Windows.Forms.Application]::DoEvents()
+        } catch {
+            $global:stopScan = $true
+            return
+        }
+        
+        if ($global:stopScan) { return }
         
         $modRes = Invoke-ModScan -FilePath $jar.FullName
         $obfRes = Invoke-ObfuscationScan -FilePath $jar.FullName
