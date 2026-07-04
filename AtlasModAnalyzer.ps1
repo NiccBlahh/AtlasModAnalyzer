@@ -1,6 +1,7 @@
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+$ErrorActionPreference = "SilentlyContinue"
 
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -109,8 +110,16 @@ $lblStatus = $Form.FindName("lblStatus")
 $flowDoc = $Form.FindName("flowDoc")
 
 $global:stopScan = $false
+$global:closePending = $false
+$global:isScanning = $false
+
 $Form.Add_Closing({
-    $global:stopScan = $true
+    param($sender, $e)
+    if ($global:isScanning) {
+        $e.Cancel = $true
+        $global:stopScan = $true
+        $global:closePending = $true
+    }
 })
 
 function Append-Log {
@@ -743,6 +752,8 @@ function Invoke-JvmScan {
 # --- BUTTON CLICK HANDLER ---
 $btnScan.Add_Click({
     $global:stopScan = $false
+    $global:closePending = $false
+    $global:isScanning = $true
     $btnScan.IsEnabled = $false
     $rtbOutput.Document.Blocks.Clear()
     $lblStatus.Text = "Scanning..."
@@ -815,7 +826,12 @@ $btnScan.Add_Click({
     Append-Log " JVM PROCESS SCAN" "#64B5F6" -Bold
     Invoke-JvmScan
     
-    if ($global:stopScan) { return }
+    if ($global:stopScan) {
+        $global:isScanning = $false
+        if ($global:closePending) { $Form.Close() }
+        return
+    }
+
     Append-Log " SCAN COMPLETE!" "#81C784" -Bold
     Append-Log " Total Scanned: $total" "#FFFFFF"
     Append-Log " Flagged Mods:  $flaggedCount" "#E53935"
@@ -823,6 +839,8 @@ $btnScan.Add_Click({
 
     $lblStatus.Text = "Scan Complete."
     $btnScan.IsEnabled = $true
+    $global:isScanning = $false
+    if ($global:closePending) { $Form.Close() }
 })
 
 $Form.ShowDialog() | Out-Null
