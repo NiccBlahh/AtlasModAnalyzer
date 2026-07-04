@@ -485,7 +485,12 @@ function Invoke-ModScan {
             } catch { }
         }
 
+        $entryCount = 0
         foreach ($entry in $allEntries) {
+            if ($global:stopScan) { return }
+            $entryCount++
+            if ($entryCount % 50 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
+            
             $name = $entry.FullName
             if ($name -match '\.(class|json)$' -or $name -match 'MANIFEST\.MF') {
                 try {
@@ -567,7 +572,12 @@ function Invoke-ObfuscationScan {
             "JavaCrack"      = @("javamc.obf","MCrack","mcObfuscator")
         }
 
+        $entryCount = 0
         foreach ($entry in $archive.Entries) {
+            if ($global:stopScan) { return }
+            $entryCount++
+            if ($entryCount % 50 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
+
             $name = $entry.FullName
             if ($name -match "\.class$") {
                 $totalClass++
