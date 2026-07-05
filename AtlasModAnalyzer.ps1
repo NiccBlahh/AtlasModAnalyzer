@@ -6,7 +6,7 @@ $ErrorActionPreference = "SilentlyContinue"
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Atlas Mod Analyzer" Height="750" Width="900" WindowStartupLocation="CenterScreen"
+        Title="Atlas Mod Analyzer" Height="780" Width="900" WindowStartupLocation="CenterScreen"
         Background="#1E1E1E">
     <Window.Resources>
         <!-- Flat Button Style -->
@@ -34,6 +34,10 @@ $ErrorActionPreference = "SilentlyContinue"
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="#222222"/>
                 </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Background" Value="#2A2A2A"/>
+                    <Setter Property="Foreground" Value="#777777"/>
+                </Trigger>
             </Style.Triggers>
         </Style>
 
@@ -47,6 +51,15 @@ $ErrorActionPreference = "SilentlyContinue"
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="#005A9E"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#C62828"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E53935"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -68,18 +81,22 @@ $ErrorActionPreference = "SilentlyContinue"
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        
+
         <!-- Top Section: Centered Controls -->
         <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,20,0,30">
             <TextBlock Text="ATLAS MOD ANALYZER" Foreground="#E0E0E0" FontFamily="Segoe UI" FontSize="24" FontWeight="Light" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-            
+
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,15">
                 <TextBlock Text="Target Path:" Foreground="#AAAAAA" FontFamily="Segoe UI" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <TextBox Name="txtPath" Width="400" Text="$env:USERPROFILE\AppData\Roaming\.minecraft\mods" VerticalAlignment="Center"/>
+                <TextBox Name="txtPath" Width="380" Text="$env:USERPROFILE\AppData\Roaming\.minecraft\mods" VerticalAlignment="Center"/>
                 <Button Name="btnBrowse" Content="Browse..." Margin="10,0,0,0" VerticalAlignment="Center"/>
             </StackPanel>
 
-            <Button Name="btnScan" Style="{StaticResource PrimaryButton}" Content="START SCAN" FontSize="16" Padding="40,12" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Name="btnScan" Style="{StaticResource PrimaryButton}" Content="START SCAN" FontSize="16" Padding="40,12"/>
+                <Button Name="btnStop" Style="{StaticResource DangerButton}" Content="STOP" FontSize="16" Padding="30,12" Margin="10,0,0,0" IsEnabled="False"/>
+                <Button Name="btnSave" Content="Save Report..." FontSize="14" Padding="20,12" Margin="10,0,0,0" IsEnabled="False"/>
+            </StackPanel>
         </StackPanel>
 
         <!-- Output Area -->
@@ -92,7 +109,7 @@ $ErrorActionPreference = "SilentlyContinue"
                 </FlowDocument>
             </RichTextBox>
         </Border>
-        
+
         <!-- Status Bar -->
         <TextBlock Name="lblStatus" Grid.Row="2" Text="Idle." Foreground="#888888" FontFamily="Segoe UI" FontSize="12" Margin="0,10,0,0"/>
     </Grid>
@@ -102,16 +119,19 @@ $ErrorActionPreference = "SilentlyContinue"
 $reader = (New-Object System.Xml.XmlNodeReader $xaml)
 $Form = [Windows.Markup.XamlReader]::Load($reader)
 
-$txtPath = $Form.FindName("txtPath")
+$txtPath   = $Form.FindName("txtPath")
 $btnBrowse = $Form.FindName("btnBrowse")
-$btnScan = $Form.FindName("btnScan")
+$btnScan   = $Form.FindName("btnScan")
+$btnStop   = $Form.FindName("btnStop")
+$btnSave   = $Form.FindName("btnSave")
 $rtbOutput = $Form.FindName("rtbOutput")
 $lblStatus = $Form.FindName("lblStatus")
-$flowDoc = $Form.FindName("flowDoc")
+$flowDoc   = $Form.FindName("flowDoc")
 
-$global:stopScan = $false
+$global:stopScan     = $false
 $global:closePending = $false
-$global:isScanning = $false
+$global:isScanning   = $false
+$global:reportLines  = [System.Collections.Generic.List[string]]::new()
 
 $Form.Add_Closing({
     param($sender, $e)
@@ -126,6 +146,7 @@ function Append-Log {
     param([string]$text, [string]$color="#CCCCCC", [switch]$Bold)
     if ($global:stopScan) { return }
     try {
+        [void]$global:reportLines.Add($text)
         $brush = (New-Object System.Windows.Media.BrushConverter).ConvertFromString($color)
         $run = New-Object System.Windows.Documents.Run($text + "`r`n")
         $run.Foreground = $brush
@@ -148,7 +169,28 @@ $btnBrowse.Add_Click({
     }
 })
 
+$btnStop.Add_Click({
+    $global:stopScan = $true
+    $lblStatus.Text = "Stopping..."
+})
+
+$btnSave.Add_Click({
+    $dialog = New-Object System.Windows.Forms.SaveFileDialog
+    $dialog.Filter = "Text file (*.txt)|*.txt"
+    $dialog.FileName = "AtlasScanReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        try {
+            $global:reportLines | Out-File -FilePath $dialog.FileName -Encoding UTF8
+            $lblStatus.Text = "Report saved to $($dialog.FileName)"
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Failed to save report: $($_.Exception.Message)") | Out-Null
+        }
+    }
+})
+
 # ---------- PATTERN LISTS ----------
+# NOTE: lists are de-duplicated at load time below, so repeated entries here are harmless
+# (kept for readability / provenance) but do not bloat the compiled regex or hash set.
 $suspiciousPatterns = @(
     "AimAssist", "AnchorTweaks", "AutoAnchor", "AutoCrystal", "AutoDoubleHand", "JDWP.VirtualMachine.AllModules",
     "AutoHitCrystal", "AutoPot", "AutoTotem", "AutoArmor", "InventoryTotem",
@@ -161,12 +203,12 @@ $suspiciousPatterns = @(
     "LagReach", "PopSwitch", "SprintReset", "ChestSteal", "AntiBot",
     "ElytraSwap", "FastXP", "FastExp", "Refill",  "AirAnchor",
     "jnativehook", "FakeInv", "HoverTotem", "AutoClicker", "AutoFirework",
-    "PackSpoof", "Antiknockback", "catlean", 
+    "PackSpoof", "Antiknockback", "catlean",
     "AuthBypass", "Asteria", "Prestige", "AutoEat", "AutoMine",
     "MaceSwap",  "Macro198", "StunSlam", "SafeAnchor", "DoubleAnchor", "AutoTPA", "BaseFinder", "Xenon", "gypsy",
-    "AutoPotRefill", "WalksyOptimizer", "KeyPearl", "AimAssist", "AutoNethPot", "AutoDtap",
-    "TriggerBot", "AutoWeb", "AnchorAction",
-    
+    "AutoPotRefill", "KeyPearl", "AutoNethPot", "AutoDtap",
+    "AutoWeb", "AnchorAction",
+
     "org.chainlibs.module.impl.modules.Crystal.Y",
     "org.chainlibs.module.impl.modules.Crystal.bF",
     "org.chainlibs.module.impl.modules.Crystal.bM",
@@ -198,7 +240,7 @@ $cheatStrings = @(
     "ＡｕｔｏＣｒｙｓｔａｌ", "Ａｕｔｏ Ｃｒｙｓｔａｌ",
     "ＡｕｔｏＨｉｔＣｒｙｓｔａｌ",
     "AutoAnchor", "autoanchor", "auto anchor", "DoubleAnchor",
-     "HasAnchor", "anchortweaks", "anchor macro", "safe anchor", "safeanchor",
+    "HasAnchor", "anchortweaks", "anchor macro", "safe anchor", "safeanchor",
     "SafeAnchor", "AirAnchor",
     "ＡｕｔｏＡｎｃｈｏｒ", "Ａｕｔｏ Ａｎｃｈｏｒ",
     "ＤｏｕｂｌｅＡｎｃｈｏｒ", "Ｄｏｕｂｌｅ Ａｎｃｈｏｒ",
@@ -295,7 +337,7 @@ $cheatStrings = @(
     "Ｒｅｍｏｖｅｓ ｔｈｅ ｃｒｙｓｔａｌ ｂｏｕｎｃｅ ａｎｉｍａｔｉｏｎ",
     "Place Delay", "Ｐｌａｃｅ Ｄｅｌａｙ",
     "Break Delay", "Ｂｒｅａｋ Ｄｅｌａｙ",
-     "Ｆａｓｔ Ｍｏｄｅ",
+    "Ｆａｓｔ Ｍｏｄｅ",
     "Place Chance", "Ｐｌａｃｅ Ｃｈａｎｃｅ",
     "Break Chance", "Ｂｒｅａｋ Ｃｈａｎｃｅ",
     "Stop On Kill", "Ｓｔｏｐ Ｏｎ Ｋｉｌｌ",
@@ -362,8 +404,7 @@ $cheatStrings = @(
     "Include Head", "Ｉｎｃｌｕｄｅ Ｈｅａｄ",
     "Web Delay", "Ｗｅｂ Ｄｅｌａｙ",
     "Holding Web", "Ｈｏｌｄｉｎｇ Ｗｅｂ",
-    "Not When Affects Player", "Ｎｏｔ"
-     "Ｗｈｅｎ Ａｆｆｅｃｔｓ Ｐｌａｙｅｒ",
+    "Not When Affects Player", "Ｎｏｔ Ｗｈｅｎ Ａｆｆｅｃｔｓ Ｐｌａｙｅｒ",
     "Hit Delay", "Ｈｉｔ Ｄｅｌａｙ",
     "Ｓｗｉｔｃｈ Ｂａｃｋ",
     "Require Hold Axe", "Ｒｅｑｕｉｒｅ Ｈｏｌｄ Ａｘｅ",
@@ -415,7 +456,7 @@ $cheatStrings = @(
     "FakeNick", "PopSwitch",
     "FakeLatency", "FakePing", "SpoofRotation", "PositionSpoof",
     "GameSpeed", "SpeedTimer",
-     "GrimBypass", "VulcanBypass", "MatrixBypass",
+    "GrimBypass", "VulcanBypass", "MatrixBypass",
     "AACBypass", "VerusDisabler", "IntaveBypass", "WatchdogBypass",
     "PacketMine", "PacketWalk", "PacketSneak", "PacketCancel", "PacketDupe", "PacketSpam",
     "SelfDestruct", "HideClient",
@@ -444,20 +485,32 @@ $cheatStrings = @(
     "pandaware", "skilled", "moonClient", "astolfo",
     "futureClient", "konas", "rusherhack", "inertia", "exhibition",
     "dev.krypton", "dev/krypton", "skid.krypton", "skid/krypton",
-     "VirginClient", "virgin client",
+    "VirginClient", "virgin client",
     "catlean", "CatleanClient", "catlean client",
-     "ArgonClient", "argon client",
+    "ArgonClient", "argon client",
     "Asteria", "AsteriaClient", "asteria client",
     "Prestige", "PrestigeClient", "prestige client", "prestigeclient.vip",
     "gypsy", "GypsyClient", "gypsy client",
     "Xenon", "XenonClient", "xenon client",
-     "GrimClient", "grim client",
+    "GrimClient", "grim client",
     "phantom-refmap.json",
-     "dqrkis.xyz", "Dqrkis Client"
+    "dqrkis.xyz", "Dqrkis Client"
 )
 
+# De-duplicate once at load time. This shrinks the compiled alternation regex
+# (fewer branches = faster matching) and keeps the hash-set lookup clean,
+# without requiring the lists above to be hand-curated for duplicates.
+$suspiciousPatterns = @($suspiciousPatterns | Select-Object -Unique)
+$cheatStrings       = @($cheatStrings       | Select-Object -Unique)
+
 $fullwidthRegex = [regex]::new("[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}", [System.Text.RegularExpressions.RegexOptions]::Compiled)
-$patternRegex = [regex]::new('(?<![A-Za-z])(' + ($suspiciousPatterns -join '|') + ')(?![A-Za-z])', [System.Text.RegularExpressions.RegexOptions]::Compiled)
+
+# Escape each literal before joining into the alternation so that patterns
+# containing regex metacharacters (e.g. the dots in "org.chainlibs...") are
+# matched literally instead of "." meaning "any character".
+$escapedPatterns = $suspiciousPatterns | ForEach-Object { [regex]::Escape($_) }
+$patternRegex = [regex]::new('(?<![A-Za-z])(' + ($escapedPatterns -join '|') + ')(?![A-Za-z])', [System.Text.RegularExpressions.RegexOptions]::Compiled)
+
 $cheatStringSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 foreach ($s in $cheatStrings) { [void]$cheatStringSet.Add($s) }
 
@@ -467,20 +520,21 @@ function Invoke-ModScan {
     $foundPatterns  = [System.Collections.Generic.HashSet[string]]::new()
     $foundStrings   = [System.Collections.Generic.HashSet[string]]::new()
     $foundFullwidth = [System.Collections.Generic.HashSet[string]]::new()
+    $archive = $null
+    $innerArchives = [System.Collections.Generic.List[object]]::new()
     try {
         $archive = [System.IO.Compression.ZipFile]::OpenRead($FilePath)
         $allEntries = [System.Collections.Generic.List[object]]::new()
-        $innerArchives = [System.Collections.Generic.List[object]]::new()
 
         $entryCount = 0
         foreach ($entry in $archive.Entries) {
-            if ($global:stopScan) { return }
+            if ($global:stopScan) { return @{ Patterns = $foundPatterns; Strings = $foundStrings; Fullwidth = $foundFullwidth } }
             $entryCount++
-            if ($entryCount % 10 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
-            
+            if ($entryCount % 25 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
+
             foreach ($m in $patternRegex.Matches($entry.FullName)) { [void]$foundPatterns.Add($m.Value) }
             $allEntries.Add($entry)
-            
+
             if ($entry.FullName -match "^META-INF/jars/.+\.jar$") {
                 try {
                     $ns = $entry.Open(); $ms = New-Object System.IO.MemoryStream
@@ -494,10 +548,10 @@ function Invoke-ModScan {
 
         $entryCount = 0
         foreach ($entry in $allEntries) {
-            if ($global:stopScan) { return }
+            if ($global:stopScan) { return @{ Patterns = $foundPatterns; Strings = $foundStrings; Fullwidth = $foundFullwidth } }
             $entryCount++
-            if ($entryCount % 10 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
-            
+            if ($entryCount % 25 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
+
             $name = $entry.FullName
             if ($name -match '\.(class|json)$' -or $name -match 'MANIFEST\.MF') {
                 try {
@@ -508,17 +562,22 @@ function Invoke-ModScan {
                     $utf8  = [System.Text.Encoding]::UTF8.GetString($bytes)
                     foreach ($m in $patternRegex.Matches($ascii)) { [void]$foundPatterns.Add($m.Value) }
                     foreach ($s in $cheatStringSet) {
-                        if ($ascii.Contains($s)) { [void]$foundStrings.Add($s); continue }
-                        if ($utf8.Contains($s))  { [void]$foundStrings.Add($s) }
+                        if ($ascii.Contains($s, [System.StringComparison]::Ordinal)) { [void]$foundStrings.Add($s); continue }
+                        if ($utf8.Contains($s, [System.StringComparison]::Ordinal))  { [void]$foundStrings.Add($s) }
                     }
                     foreach ($m in $fullwidthRegex.Matches($utf8)) { [void]$foundFullwidth.Add($m.Value) }
                 } catch { }
             }
         }
+    } catch {
+        # Locked/corrupt/non-zip jar - surface nothing rather than silently
+        # pretending the file was clean.
+        [void]$foundStrings.Add("[scan error: $($_.Exception.Message)]")
+    } finally {
         foreach ($ia in $innerArchives) { try { $ia.Dispose() } catch { } }
-        $archive.Dispose()
-    } catch { }
-    
+        if ($archive) { try { $archive.Dispose() } catch { } }
+    }
+
     $fwCheatPool = @($cheatStrings | Where-Object { $_ -cmatch "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]" })
     $resolvedFullwidth = [System.Collections.Generic.HashSet[string]]::new()
     foreach ($fw in @($foundFullwidth)) {
@@ -548,6 +607,7 @@ function Invoke-ModScan {
 function Invoke-ObfuscationScan {
     param([string]$FilePath)
     $flags = [System.Collections.Generic.List[string]]::new()
+    $archive = $null
     try {
         $archive = [System.IO.Compression.ZipFile]::OpenRead($FilePath)
         $totalClass=0; $numericCount=0; $unicodeCount=0; $fullwidthCount=0; $japaneseCount=0
@@ -581,9 +641,9 @@ function Invoke-ObfuscationScan {
 
         $entryCount = 0
         foreach ($entry in $archive.Entries) {
-            if ($global:stopScan) { return }
+            if ($global:stopScan) { return $flags }
             $entryCount++
-            if ($entryCount % 10 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
+            if ($entryCount % 25 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
 
             $name = $entry.FullName
             if ($name -match "\.class$") {
@@ -614,9 +674,8 @@ function Invoke-ObfuscationScan {
                 }
             }
         }
-        $archive.Dispose()
         if ($totalClass -lt 5) { return $flags }
-        
+
         $pct = { param($n) [math]::Round(($n / $totalClass) * 100) }
         $numPct  = & $pct $numericCount;  $uniPct  = & $pct $unicodeCount;  $fwPct = & $pct $fullwidthCount
         $jpPct   = & $pct $japaneseCount; $s1Pct   = & $pct $singleLetterCount; $s2Pct = & $pct $twoLetterCount
@@ -631,7 +690,7 @@ function Invoke-ObfuscationScan {
         if ($novPct  -ge 8) { $flags.Add("No-vowel class names - $novPct%") }
         if ($confPct -ge 3) { $flags.Add("Confusion-char names (Il1O0/_) - $confPct%") }
         if ($singleCharPkg -ge 6) { $flags.Add("Single-char package paths - $singleCharPkg path segments like a/b/c") }
-        
+
         $sampleStr = $contentSample.ToString()
         $fwStringMatches = [regex]::Matches($sampleStr, "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}")
         if ($fwStringMatches.Count -gt 0) {
@@ -643,7 +702,7 @@ function Invoke-ObfuscationScan {
                 if ($sampleStr.Contains($pat)) { $flags.Add("Known cheat obfuscator detected - $obfName (matched: $pat)"); break }
             }
         }
-        
+
         $obfStringPatterns = @(
             @{Pattern='(?i)(?:string|str)_(?:obf|enc|crypt|hide|mangle)'; Label='String obfuscation methods'},
             @{Pattern='(?i)decrypt(?:String|Str|Key|Payload)'; Label='Decryption methods present'},
@@ -653,11 +712,13 @@ function Invoke-ObfuscationScan {
         foreach ($obfPat in $obfStringPatterns) {
             if ($sampleStr -match $obfPat.Pattern) { $flags.Add("$($obfPat.Label) - matched: $($matches[0])") }
         }
-        
+
         $reflectCount = [regex]::Matches($sampleStr, '(?i)(?:getDeclaredMethod|getDeclaredField|setAccessible|invoke\s*\(|forName\s*\()').Count
         if ($reflectCount -ge 50) { $flags.Add("Heavy reflection usage - $reflectCount reflection calls") }
 
-    } catch { }
+    } catch { } finally {
+        if ($archive) { try { $archive.Dispose() } catch { } }
+    }
     return $flags
 }
 
@@ -669,8 +730,7 @@ function Invoke-JvmScan {
     }
 
     Append-Log "  [i] Scanning $($javaProcesses.Count) Java process(es)..." "#00FFFF"
-    $foundInjection = $false
-    
+
     $fabricPatterns = @{
         "fabric.addMods"='-Dfabric\.addMods=';
         "fabric.loadMods"='-Dfabric\.loadMods=';
@@ -737,13 +797,15 @@ function Invoke-JvmScan {
     foreach ($proc in $javaProcesses) {
         if ($global:stopScan) { return }
         try {
-            $cmdLine = (Get-WmiObject Win32_Process -Filter "ProcessId = $($proc.Id)" -ErrorAction Stop).CommandLine
+            # Get-CimInstance replaces the deprecated Get-WmiObject: faster,
+            # works over WSMan/DCOM, and is the supported cmdlet on modern
+            # PowerShell (Get-WmiObject is gone entirely in PowerShell 7+).
+            $cmdLine = (Get-CimInstance Win32_Process -Filter "ProcessId = $($proc.Id)" -ErrorAction Stop).CommandLine
             if (-not $cmdLine) { continue }
             Append-Log "  +- Process: PID $($proc.Id)" "#81C784"
 
             $detectedPatterns = @()
             foreach ($k in $fabricPatterns.Keys) {
-                if ($k -eq "addOpens" -or $k -eq "addExports") { continue }
                 if ($cmdLine -match $fabricPatterns[$k]) {
                     $detectedPatterns += $k
                 }
@@ -754,7 +816,6 @@ function Invoke-JvmScan {
             if ($cmdLine -match '(%3B|%26%26|%7C%7C|%7C|%60|%24|%3C|%3E)') { $detectedPatterns += "EncodedInjection" }
 
             if ($detectedPatterns.Count -gt 0) {
-                $foundInjection = $true
                 Append-Log "  |  [!] JVM INJECTION DETECTED!" "#E53935" -Bold
                 foreach ($d in $detectedPatterns) { Append-Log "  |    - $d" "#EF5350" }
             } else {
@@ -771,29 +832,45 @@ $btnScan.Add_Click({
     $global:stopScan = $false
     $global:closePending = $false
     $global:isScanning = $true
+    $global:reportLines.Clear()
     $btnScan.IsEnabled = $false
+    $btnStop.IsEnabled = $true
+    $btnSave.IsEnabled = $false
     $rtbOutput.Document.Blocks.Clear()
     $lblStatus.Text = "Scanning..."
-    
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+    # Every early-return path below must restore isScanning/button state,
+    # otherwise a closed-window race can leave the app unresponsive to
+    # further close attempts (isScanning stays true forever).
+    function Reset-ScanState {
+        $global:isScanning = $false
+        $btnScan.IsEnabled = $true
+        $btnStop.IsEnabled = $false
+        $btnSave.IsEnabled = ($global:reportLines.Count -gt 0)
+        if ($global:closePending) { $Form.Close() }
+    }
+
     Append-Log " ATLAS MOD ANALYZER SCAN STARTED" "#64B5F6" -Bold
     Append-Log " Target: $($txtPath.Text)" "#AAAAAA"
     if (-not (Test-Path $txtPath.Text -PathType Container)) {
         Append-Log "[!] Directory does not exist!" "#E53935" -Bold
-        $btnScan.IsEnabled = $true
         $lblStatus.Text = "Idle."
+        Reset-ScanState
         return
     }
 
     try { $jarFiles = Get-ChildItem -Path $txtPath.Text -Filter *.jar -ErrorAction Stop } catch {
         Append-Log "[!] Error accessing directory." "#E53935"
-        $btnScan.IsEnabled = $true
+        $lblStatus.Text = "Idle."
+        Reset-ScanState
         return
     }
 
     if ($jarFiles.Count -eq 0) {
         Append-Log "[!] No JAR files found." "#FFB74D"
-        $btnScan.IsEnabled = $true
         $lblStatus.Text = "Idle."
+        Reset-ScanState
         return
     }
 
@@ -804,25 +881,34 @@ $btnScan.Add_Click({
     $obfCount = 0
 
     for ($i = 0; $i -lt $total; $i++) {
-        if ($global:stopScan) { return }
+        if ($global:stopScan) {
+            Append-Log "`r`n[STOPPED] Scan cancelled by user." "#FFB74D" -Bold
+            Reset-ScanState
+            return
+        }
         $jar = $jarFiles[$i]
-        
+
         try {
             $lblStatus.Text = "Scanning ($($i+1)/$total): $($jar.Name)"
             [System.Windows.Forms.Application]::DoEvents()
         } catch {
             $global:stopScan = $true
+            Reset-ScanState
             return
         }
-        
-        if ($global:stopScan) { return }
-        
+
+        if ($global:stopScan) {
+            Append-Log "`r`n[STOPPED] Scan cancelled by user." "#FFB74D" -Bold
+            Reset-ScanState
+            return
+        }
+
         $modRes = Invoke-ModScan -FilePath $jar.FullName
         $obfRes = Invoke-ObfuscationScan -FilePath $jar.FullName
-        
+
         $isFlagged = ($modRes.Patterns.Count -gt 0 -or $modRes.Strings.Count -gt 0 -or $modRes.Fullwidth.Count -gt 0)
         $isObfuscated = ($obfRes.Count -gt 0)
-        
+
         if ($isFlagged) {
             $flaggedCount++
             Append-Log " [FLAGGED] $($jar.Name)" "#E53935" -Bold
@@ -831,7 +917,7 @@ $btnScan.Add_Click({
             foreach ($f in $modRes.Fullwidth) { Append-Log "    Fullwidth: $f" "#9E9E9E" }
             Append-Log ""
         }
-        
+
         if ($isObfuscated) {
             $obfCount++
             Append-Log " [OBFUSCATED] $($jar.Name)" "#FFF176" -Bold
@@ -842,22 +928,22 @@ $btnScan.Add_Click({
 
     Append-Log " JVM PROCESS SCAN" "#64B5F6" -Bold
     Invoke-JvmScan
-    
+
     if ($global:stopScan) {
-        $global:isScanning = $false
-        if ($global:closePending) { $Form.Close() }
+        Append-Log "`r`n[STOPPED] Scan cancelled by user." "#FFB74D" -Bold
+        Reset-ScanState
         return
     }
 
+    $stopwatch.Stop()
     Append-Log " SCAN COMPLETE!" "#81C784" -Bold
     Append-Log " Total Scanned: $total" "#FFFFFF"
     Append-Log " Flagged Mods:  $flaggedCount" "#E53935"
     Append-Log " Obfuscated:    $obfCount" "#FFF176"
+    Append-Log " Elapsed:       $([math]::Round($stopwatch.Elapsed.TotalSeconds, 1))s" "#888888"
 
     $lblStatus.Text = "Scan Complete."
-    $btnScan.IsEnabled = $true
-    $global:isScanning = $false
-    if ($global:closePending) { $Form.Close() }
+    Reset-ScanState
 })
 
 $Form.ShowDialog() | Out-Null
