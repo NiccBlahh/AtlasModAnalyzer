@@ -469,27 +469,34 @@ function Invoke-ModScan {
     $foundFullwidth = [System.Collections.Generic.HashSet[string]]::new()
     try {
         $archive = [System.IO.Compression.ZipFile]::OpenRead($FilePath)
-        foreach ($entry in $archive.Entries) {
-            foreach ($m in $patternRegex.Matches($entry.FullName)) { [void]$foundPatterns.Add($m.Value) }
-        }
         $allEntries = [System.Collections.Generic.List[object]]::new()
         $innerArchives = [System.Collections.Generic.List[object]]::new()
-        foreach ($e in $archive.Entries) { $allEntries.Add($e) }
-        foreach ($nj in ($archive.Entries | Where-Object { $_.FullName -match "^META-INF/jars/.+\.jar$" })) {
-            try {
-                $ns = $nj.Open(); $ms = New-Object System.IO.MemoryStream
-                $ns.CopyTo($ms); $ns.Close(); $ms.Position = 0
-                $iz = [System.IO.Compression.ZipArchive]::new($ms, [System.IO.Compression.ZipArchiveMode]::Read)
-                $innerArchives.Add($iz)
-                foreach ($ie in $iz.Entries) { $allEntries.Add($ie) }
-            } catch { }
+
+        $entryCount = 0
+        foreach ($entry in $archive.Entries) {
+            if ($global:stopScan) { return }
+            $entryCount++
+            if ($entryCount % 10 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
+            
+            foreach ($m in $patternRegex.Matches($entry.FullName)) { [void]$foundPatterns.Add($m.Value) }
+            $allEntries.Add($entry)
+            
+            if ($entry.FullName -match "^META-INF/jars/.+\.jar$") {
+                try {
+                    $ns = $entry.Open(); $ms = New-Object System.IO.MemoryStream
+                    $ns.CopyTo($ms); $ns.Close(); $ms.Position = 0
+                    $iz = [System.IO.Compression.ZipArchive]::new($ms, [System.IO.Compression.ZipArchiveMode]::Read)
+                    $innerArchives.Add($iz)
+                    foreach ($ie in $iz.Entries) { $allEntries.Add($ie) }
+                } catch { }
+            }
         }
 
         $entryCount = 0
         foreach ($entry in $allEntries) {
             if ($global:stopScan) { return }
             $entryCount++
-            if ($entryCount % 50 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
+            if ($entryCount % 10 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
             
             $name = $entry.FullName
             if ($name -match '\.(class|json)$' -or $name -match 'MANIFEST\.MF') {
@@ -576,7 +583,7 @@ function Invoke-ObfuscationScan {
         foreach ($entry in $archive.Entries) {
             if ($global:stopScan) { return }
             $entryCount++
-            if ($entryCount % 50 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
+            if ($entryCount % 10 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
 
             $name = $entry.FullName
             if ($name -match "\.class$") {
