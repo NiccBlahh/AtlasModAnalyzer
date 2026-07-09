@@ -980,7 +980,7 @@ function Invoke-FullScan {
 
     Append-Log " ATLAS MOD ANALYZER SCAN STARTED" "#64B5F6" -Bold
     Append-Log " Target: $TargetPath" "#AAAAAA"
-    Append-Log " Mode:   $(if ($DeepScan) { 'DEEP SCAN (full content + obfuscation + bypass analysis)' } else { 'NORMAL SCAN (names + manifest + hash verification)' })" "#AAAAAA"
+    Append-Log " Mode:   Full deep scan (patterns + obfuscation + bypass + JVM)" "#AAAAAA"
     Write-Host ""
 
     if (-not (Test-Path $TargetPath -PathType Container)) {
@@ -1177,46 +1177,32 @@ function Invoke-FullScan {
 # --- MAIN LOOP ---
 $defaultPath = "$env:USERPROFILE\AppData\Roaming\.minecraft\mods"
 
-while ($true) {
-    Show-Banner
+Show-Banner
 
-    Write-Host "Target Path [$defaultPath]:" -ForegroundColor Gray
-    Write-Host "> " -NoNewline -ForegroundColor DarkCyan
-    $inputPath = Read-Host
-    $targetPath = if ([string]::IsNullOrWhiteSpace($inputPath)) { $defaultPath } else { $inputPath }
+Write-Host "Target Path [$defaultPath]:" -ForegroundColor Gray
+Write-Host "> " -NoNewline -ForegroundColor DarkCyan
+$inputPath = Read-Host
+$targetPath = if ([string]::IsNullOrWhiteSpace($inputPath)) { $defaultPath } else { $inputPath }
 
-    Write-Host ""
-    Write-Host "Scan Mode:" -ForegroundColor Gray
-    Write-Host "  [1] Normal Scan  - fast, hash verify + file names + manifest" -ForegroundColor Gray
-    Write-Host "  [2] Deep Scan    - slower, opens every class, checks obfuscation, bypass, reflection" -ForegroundColor Gray
-    Write-Host "> " -NoNewline -ForegroundColor DarkCyan
-    $modeAns = Read-Host
-    $useDeepScan = ($modeAns.Trim() -eq '2')
+Write-Host ""
+Invoke-FullScan -TargetPath $targetPath -DeepScan
 
-    Write-Host ""
-    Invoke-FullScan -TargetPath $targetPath -DeepScan:$useDeepScan
-
-    Write-Host ""
-    Write-Host "Save report to file? (Y/N): " -NoNewline -ForegroundColor Gray
-    $saveAns = Read-Host
-    if ($saveAns -match '^(y|yes)$') {
-        $defaultName = "AtlasScanReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
-        Write-Host "Save as [$defaultName]: " -NoNewline -ForegroundColor Gray
-        $fileName = Read-Host
-        if ([string]::IsNullOrWhiteSpace($fileName)) { $fileName = $defaultName }
-        try {
-            $global:reportLines | Out-File -FilePath $fileName -Encoding UTF8
-            Write-Host "Report saved to $fileName" -ForegroundColor Green
-        } catch {
-            Write-Host "Failed to save report: $($_.Exception.Message)" -ForegroundColor Red
-        }
+Write-Host ""
+Write-Host "Save report to file? (Y/N): " -NoNewline -ForegroundColor Gray
+$saveAns = Read-Host
+if ($saveAns -match '^(y|yes)$') {
+    $defaultName = "AtlasScanReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+    Write-Host "Save as [$defaultName]: " -NoNewline -ForegroundColor Gray
+    $fileName = Read-Host
+    if ([string]::IsNullOrWhiteSpace($fileName)) { $fileName = $defaultName }
+    try {
+        $global:reportLines | Out-File -FilePath $fileName -Encoding UTF8
+        Write-Host "Report saved to $fileName" -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to save report: $($_.Exception.Message)" -ForegroundColor Red
     }
-
-    Write-Host ""
-    Write-Host "Scan another directory? (Y/N): " -NoNewline -ForegroundColor Gray
-    $again = Read-Host
-    if ($again -notmatch '^(y|yes)$') { break }
 }
 
 Write-Host ""
 Write-Host "Exiting Atlas Mod Analyzer." -ForegroundColor DarkGray
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
