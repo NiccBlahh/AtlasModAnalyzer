@@ -360,8 +360,13 @@ $cheatStrings = @(
     "gypsy", "GypsyClient", "gypsy client",
     "Xenon", "XenonClient", "xenon client",
      "GrimClient", "grim client",
-    "phantom-refmap.json",
-     "dqrkis.xyz", "Dqrkis Client"
+     "phantom-refmap.json",
+      "dqrkis.xyz", "Dqrkis Client",
+    "activateKey", "checkPlace", "switchDelay", "switchChance", "placeDelay", "placeChance",
+    "workWithTotem", "workWithCrystal", "clickSimulation", "swordSwap", "playersOnly",
+    "requireClick", "visibilityCheck", "targetLock", "switchTargetKey",
+    "minSpeed", "maxSpeed", "randomize", "targetBone", "weaponOnly",
+    "lockedTarget", "switchKeyWasPressed", "lastFrame", "smoothTargetPos"
 )
 
 $patternRegex = [regex]::new(
@@ -937,27 +942,18 @@ foreach ($jf in $jarFiles) {
 # 5 jvm
 Write-Host "  5/5 jvm" -ForegroundColor DarkGray
 $j = Invoke-JvmScan
-Write-Host "  done" -ForegroundColor DarkGray
+Write-Host ("  -> " + $(if ($j.Count -gt 0) { "$($j.Count) issue(s)" } else { "clean" })) -ForegroundColor DarkGray
 
 # results
-Write-Host ""; Write-Host ("." * 50) -ForegroundColor DarkGray; Write-Host ""
+Write-Host ""
 
-if ($v) { Write-Host "  OK ($($v.Count))" -ForegroundColor Green; $v|%{ Write-Host "    $($_.N) -> $($_.F)" -ForegroundColor DarkGray }; Write-Host "" }
-if ($u) { Write-Host "  ?? ($($u.Count))" -ForegroundColor Yellow; $u|%{ $x=if($_.S){" src:$($_.S)"}else{""}; Write-Host "    $($_.F)$x" -ForegroundColor Yellow }; Write-Host "" }
-if ($s) { Write-Host "  !! FLAGGED ($($s.Count))" -ForegroundColor Red; $s|%{
-    Write-Host "    > $($_.F)" -ForegroundColor Red
-    $ps=$_.P; $_.P|%{ Write-Host "      p: $_" -ForegroundColor Red }
-    $_.Str|?{$ps -notcontains $_}|%{ Write-Host "      s: $_" -ForegroundColor DarkYellow }
-    $_.Fw|%{ Write-Host "      fw: $_" -ForegroundColor Cyan }
-  }; Write-Host "" }
-if ($b) { Write-Host "  ## INJECTION ($($b.Count))" -ForegroundColor Magenta; $b|%{
-    Write-Host "    > $($_.F)" -ForegroundColor Magenta; $_.Fl|%{ Write-Host "      $_" -ForegroundColor White }
-  }; Write-Host "" }
-if ($o) { Write-Host "  %% OBFUSCATED ($($o.Count))" -ForegroundColor DarkYellow; $o|%{
-    Write-Host "    > $($_.F)" -ForegroundColor DarkYellow; $_.Fl|%{ Write-Host "      $_" -ForegroundColor Gray }
-  }; Write-Host "" }
-if ($j) { Write-Host "  JVM ($($j.Count))" -ForegroundColor Yellow; $j|%{ Write-Host "    $_" -ForegroundColor Yellow }; Write-Host "" }
+if ($v) { $v|%{ Write-Host "  [$($_.N)]" -ForegroundColor Green -NoNewline; Write-Host " $($_.F)" -ForegroundColor DarkGray } }
+if ($u) { $u|%{ $x=if($_.S){" ($($_.S))"}else{""}; Write-Host "  [?]$($_.F)$x" -ForegroundColor Yellow } }
+if ($s) { $s|%{ Write-Host "  [!] $($_.F)" -ForegroundColor Red; $ps=$_.P; $_.P|%{ Write-Host "    p:$_" -ForegroundColor Red }; $_.Str|?{$ps -notcontains $_}|%{ Write-Host "    s:$_" -ForegroundColor DarkYellow }; $_.Fw|%{ Write-Host "    fw:$_" -ForegroundColor Cyan } } }
+if ($b) { $b|%{ Write-Host "  [#] $($_.F)" -ForegroundColor Magenta; $_.Fl|%{ Write-Host "    $_" -ForegroundColor White } } }
+if ($o) { $o|%{ Write-Host "  [%] $($_.F)" -ForegroundColor DarkYellow; $_.Fl|%{ Write-Host "    $_" -ForegroundColor Gray } } }
+if ($j) { $j|%{ Write-Host "  [JVM] $_" -ForegroundColor Yellow } }
 
-Write-Host ("." * 50) -ForegroundColor DarkGray; Write-Host ""
-Write-Host "  scanned:$t ok:$($v.Count) unk:$($u.Count) bad:$($s.Count) inj:$($b.Count) obf:$($o.Count) jvm:$($j.Count)" -ForegroundColor Gray
-Write-Host "  any key to exit" -ForegroundColor DarkGray; $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host ""; Write-Host "-"*40 -ForegroundColor DarkGray
+Write-Host "  S:$t OK:$($v.Count) ?:$($u.Count) !:$($s.Count) #:$($b.Count) %:$($o.Count) JVM:$($j.Count)" -ForegroundColor Gray
+Write-Host "  any key" -ForegroundColor DarkGray; $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
