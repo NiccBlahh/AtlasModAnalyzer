@@ -945,36 +945,25 @@ $j = Invoke-JvmScan
 Write-Host ("  -> " + $(if ($j.Count -gt 0) { "$($j.Count) issue(s)" } else { "clean" })) -ForegroundColor DarkGray
 
 # results
-Write-Host ""
-Write-Host (" " * 2) + ("=" * 42) -ForegroundColor DarkGray
+Write-Host ""; Write-Host ("=" * 44) -ForegroundColor DarkGray
 
-if ($v) {
-    Write-Host (" " * 3) + "OK ($($v.Count))" -ForegroundColor Green
-    $v|%{ Write-Host (" " * 5) + "$($_.N)".PadRight(28) + "$($_.F)" -ForegroundColor DarkGray }
-    Write-Host " "
-}
-if ($u) {
-    Write-Host (" " * 3) + "UNKNOWN ($($u.Count))" -ForegroundColor Yellow
-    $u|%{ $x=if($_.S){"  ($($_.S))"}else{""}; Write-Host (" " * 5) + "? $($_.F)$x" -ForegroundColor Yellow }
-    Write-Host " "
-}
-if ($s) {
-    Write-Host (" " * 3) + "FLAGGED ($($s.Count))" -ForegroundColor Red
-    $s|%{ Write-Host (" " * 5) + "! $($_.F)" -ForegroundColor Red; $ps=$_.P; $_.P|%{ Write-Host (" " * 7) + "p: $_" -ForegroundColor Red }; $_.Str|?{$ps -notcontains $_}|%{ Write-Host (" " * 7) + "s: $_" -ForegroundColor DarkYellow }; $_.Fw|%{ Write-Host (" " * 7) + "fw: $_" -ForegroundColor Cyan }; Write-Host " " }
-}
-if ($b) {
-    Write-Host (" " * 3) + "INJECTION ($($b.Count))" -ForegroundColor Magenta
-    $b|%{ Write-Host (" " * 5) + "# $($_.F)" -ForegroundColor Magenta; $_.Fl|%{ Write-Host (" " * 7) + "$_" -ForegroundColor White }; Write-Host " " }
-}
-if ($o) {
-    Write-Host (" " * 3) + "OBFUSCATED ($($o.Count))" -ForegroundColor DarkYellow
-    $o|%{ Write-Host (" " * 5) + "% $($_.F)" -ForegroundColor DarkYellow; $_.Fl|%{ Write-Host (" " * 7) + "$_" -ForegroundColor Gray }; Write-Host " " }
-}
-if ($j) {
-    Write-Host (" " * 3) + "JVM ($($j.Count))" -ForegroundColor Yellow
-    $j|%{ Write-Host (" " * 5) + "$_" -ForegroundColor Yellow }; Write-Host " "
+# build lookup maps
+$m = @{}; $v|%{ $m[$_.F] = "OK" }; $u|%{ $m[$_.F] = "?" }; $s|%{ $m[$_.F] = "!" }; $b|%{ $m[$_.F] = "#" }; $o|%{ $m[$_.F] = "%" }
+
+# one line per jar
+foreach ($jf in $jarFiles) {
+    $n = $jf.Name; $c = "DarkGray"
+    if ($m[$n] -eq "OK") { $c = "Green" } elseif ($m[$n] -eq "?") { $c = "Yellow" } elseif ($m[$n] -eq "!") { $c = "Red" } elseif ($m[$n] -eq "#") { $c = "Magenta" } elseif ($m[$n] -eq "%") { $c = "DarkYellow" }
+    Write-Host ("  [{0}] {1}" -f $m[$n], $n) -ForegroundColor $c
+    if ($m[$n] -eq "OK") { $r = $v|?{$_.F -eq $n}; if ($r) { Write-Host ("       $($r[0].N)") -ForegroundColor DarkGray } }
+    if ($m[$n] -eq "?")  { $r = $u|?{$_.F -eq $n}; if ($r -and $r[0].S) { Write-Host ("       src: $($r[0].S)") -ForegroundColor DarkGray } }
+    if ($m[$n] -eq "!")  { $r = $s|?{$_.F -eq $n}; if ($r) { $ps=$r[0].P; $r[0].P|%{ Write-Host ("       p:$_") -ForegroundColor Red }; $r[0].Str|?{$ps -notcontains $_}|%{ Write-Host ("       s:$_") -ForegroundColor DarkYellow }; $r[0].Fw|%{ Write-Host ("       fw:$_") -ForegroundColor Cyan } } }
+    if ($m[$n] -eq "#")  { $r = $b|?{$_.F -eq $n}; if ($r) { $r[0].Fl|%{ Write-Host ("       $_") -ForegroundColor White } } }
+    if ($m[$n] -eq "%")  { $r = $o|?{$_.F -eq $n}; if ($r) { $r[0].Fl|%{ Write-Host ("       $_") -ForegroundColor Gray } } }
 }
 
-Write-Host (" " * 2) + ("=" * 42) -ForegroundColor DarkGray
-Write-Host (" " * 3) + "S:$t  OK:$($v.Count)  ?:$($u.Count)  !:$($s.Count)  #:$($b.Count)  %:$($o.Count)  JVM:$($j.Count)" -ForegroundColor Gray
-Write-Host (" " * 3) + "any key" -ForegroundColor DarkGray; $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+if ($j) { Write-Host ""; Write-Host "  [JVM]" -ForegroundColor Yellow; $j|%{ Write-Host ("       $_") -ForegroundColor Yellow } }
+
+Write-Host ""; Write-Host ("=" * 44) -ForegroundColor DarkGray
+Write-Host "  $t files  OK:$($v.Count)  ?:$($u.Count)  !:$($s.Count)  #:$($b.Count)  %:$($o.Count)  JVM:$($j.Count)" -ForegroundColor Gray
+Write-Host "  any key" -ForegroundColor DarkGray; $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
