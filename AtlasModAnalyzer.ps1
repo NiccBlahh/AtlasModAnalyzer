@@ -100,7 +100,16 @@ $suspiciousPatterns = @(
     "じ.class", "ふ.class", "ぶ.class", "ぷ.class", "た.class",
     "ね.class", "そ.class", "な.class", "ど.class", "ぐ.class",
     "ず.class", "で.class", "つ.class", "べ.class", "せ.class",
-    "と.class", "み.class", "び.class", "す.class", "の.class"
+    "と.class", "み.class", "び.class", "す.class", "の.class",
+    "activateKey", "checkPlace", "switchDelay", "switchChance", "placeDelay", "placeChance",
+    "workWithTotem", "workWithCrystal", "clickSimulation", "swordSwap", "playersOnly",
+    "requireClick", "visibilityCheck", "targetLock", "switchTargetKey",
+    "minSpeed", "maxSpeed", "randomize", "targetBone", "weaponOnly",
+    "lockedTarget", "switchKeyWasPressed", "lastFrame", "smoothTargetPos",
+    "BufferState", "CalculateRange", "JoinerWriter", "keyBind", "NotifyResolver",
+    "QueryZone", "RenderController", "StringDecoder", "TokenExtractor",
+    "VerificationGuard", "YieldKeeper", "cfr",
+    "guiKey", "redColor", "net.caffeinemc.mods.lithium"
 )
 
 $cheatStrings = @(
@@ -366,7 +375,11 @@ $cheatStrings = @(
     "workWithTotem", "workWithCrystal", "clickSimulation", "swordSwap", "playersOnly",
     "requireClick", "visibilityCheck", "targetLock", "switchTargetKey",
     "minSpeed", "maxSpeed", "randomize", "targetBone", "weaponOnly",
-    "lockedTarget", "switchKeyWasPressed", "lastFrame", "smoothTargetPos"
+    "lockedTarget", "switchKeyWasPressed", "lastFrame", "smoothTargetPos",
+    "BufferState", "CalculateRange", "JoinerWriter", "keyBind", "NotifyResolver",
+    "QueryZone", "RenderController", "StringDecoder", "TokenExtractor",
+    "VerificationGuard", "YieldKeeper", "cfr", "default.json",
+    "guiKey", "redColor", "net/caffeinemc/mods/lithium/fabric/compat/core"
 )
 
 $patternRegex = [regex]::new(
@@ -470,28 +483,29 @@ function Invoke-ModScan {
         foreach ($entry in $allEntries) {
             $name = $entry.FullName
 
-            if ($name -match '\.(class|json)$' -or $name -match 'MANIFEST\.MF') {
-                try {
-                    $st = $entry.Open()
-                    $ms2 = New-Object System.IO.MemoryStream
-                    $st.CopyTo($ms2); $st.Close()
-                    $bytes = $ms2.ToArray(); $ms2.Dispose()
+            foreach ($m in $patternRegex.Matches($name)) { [void]$foundPatterns.Add($m.Value) }
 
-                    $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
-                    $utf8  = [System.Text.Encoding]::UTF8.GetString($bytes)
+            try {
+                $st = $entry.Open()
+                $ms2 = New-Object System.IO.MemoryStream
+                $st.CopyTo($ms2); $st.Close()
+                $bytes = $ms2.ToArray(); $ms2.Dispose()
 
-                    foreach ($m in $patternRegex.Matches($ascii)) { [void]$foundPatterns.Add($m.Value) }
+                $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
+                $utf8  = [System.Text.Encoding]::UTF8.GetString($bytes)
+                $lower = $ascii.ToLowerInvariant()
 
-                    foreach ($s in $cheatStringSet) {
-                        if ($ascii.Contains($s)) { [void]$foundStrings.Add($s); continue }
-                        if ($utf8.Contains($s))  { [void]$foundStrings.Add($s) }
-                    }
+                foreach ($m in $patternRegex.Matches($ascii)) { [void]$foundPatterns.Add($m.Value) }
 
-                    foreach ($m in $fullwidthRegex.Matches($utf8)) {
-                        [void]$foundFullwidth.Add($m.Value)
-                    }
-                } catch { }
-            }
+                foreach ($s in $cheatStringSet) {
+                    if ($lower.Contains($s.ToLowerInvariant())) { [void]$foundStrings.Add($s); continue }
+                    if ($utf8.IndexOf($s, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { [void]$foundStrings.Add($s) }
+                }
+
+                foreach ($m in $fullwidthRegex.Matches($utf8)) {
+                    [void]$foundFullwidth.Add($m.Value)
+                }
+            } catch { }
         }
 
         foreach ($ia in $innerArchives) { try { $ia.Dispose() } catch { } }
