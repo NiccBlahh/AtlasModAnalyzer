@@ -876,193 +876,88 @@ function Invoke-JvmScan {
     return $results
 }
 
-function Write-Sep {
-    param([string]$C = "-", [int]$W = 60)
-    Write-Host (" " * 2) + ($C * $W) -ForegroundColor DarkGray
+$v = @(); $u = @(); $s = @(); $b = @(); $o = @()
+
+try { $jarFiles = Get-ChildItem -Path $modsPath -Filter *.jar -ErrorAction Stop } catch {
+    Write-Host "err: $_"; $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown"); exit 1
 }
+if ($jarFiles.Count -eq 0) { Write-Host "no jars found"; $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown"); exit 0 }
 
-function Write-H {
-    param([string]$T, [int]$N, [string]$C = "Gray")
-    Write-Host ""; Write-Host (" " * 2) + ">> $T [$N]" -ForegroundColor $C
-}
-
-function Write-SusCard {
-    param($M)
-    Write-Sep "-" 66; Write-Host (" " * 3) + "! $($M.FileName)" -ForegroundColor Red; Write-Sep "-" 66
-    if ($M.Patterns.Count -gt 0) { Write-Host (" " * 5) + "patterns:" -ForegroundColor DarkGray; foreach ($p in ($M.Patterns | Sort-Object)) { Write-Host (" " * 7) + "- $p" -ForegroundColor Red } }
-    $us = $M.Strings | Where-Object { $M.Patterns -notcontains $_ } | Sort-Object
-    if ($us.Count -gt 0) { Write-Host (" " * 5) + "strings:" -ForegroundColor DarkGray; foreach ($s in $us) { Write-Host (" " * 7) + "- $s" -ForegroundColor DarkYellow } }
-    if ($M.Fullwidth -and $M.Fullwidth.Count -gt 0) { Write-Host (" " * 5) + "fullwidth:" -ForegroundColor DarkGray; foreach ($fw in ($M.Fullwidth | Sort-Object)) { Write-Host (" " * 7) + "- $fw" -ForegroundColor Cyan } }
-    Write-Host ""
-}
-
-function Write-InjCard {
-    param($M)
-    Write-Sep "-" 66; Write-Host (" " * 3) + "# INJECTION  $($M.FileName)" -ForegroundColor Magenta; Write-Sep "-" 66
-    foreach ($fl in $M.Flags) { Write-Host (" " * 5) + "- $fl" -ForegroundColor White }; Write-Host ""
-}
-
-function Write-ObfCard {
-    param($M)
-    Write-Sep "-" 66; Write-Host (" " * 3) + "% OBFUSCATED  $($M.FileName)" -ForegroundColor DarkYellow; Write-Sep "-" 66
-    foreach ($fl in $M.Flags) { Write-Host (" " * 5) + "- $fl" -ForegroundColor Gray }; Write-Host ""
-}
-
-$verifiedMods    = @()
-$unknownMods     = @()
-$suspiciousMods  = @()
-$bypassMods      = @()
-$obfuscatedMods  = @()
-
-try {
-    $jarFiles = Get-ChildItem -Path $modsPath -Filter *.jar -ErrorAction Stop
-} catch {
-    Write-Host "Error accessing directory: $_" -ForegroundColor Red
-    Write-Host "Press any key to exit..." -ForegroundColor Gray
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    exit 1
-}
-
-if ($jarFiles.Count -eq 0) {
-    Write-Host "No JAR files found in: $modsPath" -ForegroundColor Yellow
-    Write-Host "Press any key to exit..." -ForegroundColor Gray
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    exit 0
-}
-
-$fileWord = if ($jarFiles.Count -eq 1) { "file" } else { "files" }
-Write-Host (" " * 3) + "$($jarFiles.Count) JAR $fileWord found" -ForegroundColor Green
+Write-Host "  $($jarFiles.Count) jar(s)" -ForegroundColor Green
 Write-Host ""
 
-$seq = 0; $totalFiles = $jarFiles.Count
-$marks = @("|", "/", "-", "\")
+$i=0; $t=$jarFiles.Count; $sp="/-\|"
 
-Write-Host (" " * 2) + "[1/5] Hash lookup (Modrinth + Megabase)..." -ForegroundColor DarkGray
-
-foreach ($jar in $jarFiles) {
-    $seq++; $m = $marks[$seq % $marks.Length]
-    Write-Host "`r  $m $seq/$totalFiles  $($jar.Name)" -NoNewline
-
-    $hash = Get-FileSHA1 -Path $jar.FullName
-    if ($hash) {
-        $modrinthData = Query-Modrinth -Hash $hash
-        if ($modrinthData.Slug) {
-            $wl = @("viafabricplus","viafabricversion") -contains $modrinthData.Slug.ToLower()
-            $verifiedMods += [PSCustomObject]@{ ModName=$modrinthData.Name; FileName=$jar.Name; FilePath=$jar.FullName; ModrinthWhitelisted=$wl }
-            continue
-        }
-        $megabaseData = Query-Megabase -Hash $hash
-        if ($megabaseData.name) {
-            $verifiedMods += [PSCustomObject]@{ ModName=$megabaseData.name; FileName=$jar.Name; FilePath=$jar.FullName; ModrinthWhitelisted=$false }
-            continue
-        }
+# 1 hash
+Write-Host "  1/5 hashing" -ForegroundColor DarkGray
+foreach ($jf in $jarFiles) {
+    $i++; Write-Host "`r  $($sp[$i%4]) $i/$t $($jf.Name)" -NoNewline
+    $h = Get-FileSHA1 -Path $jf.FullName
+    if ($h) {
+        $md = Query-Modrinth -Hash $h
+        if ($md.Slug) { $v += [PSCustomObject]@{ N=$md.Name; F=$jf.Name; W=@("viafabricplus","viafabricversion") -contains $md.Slug.ToLower() }; continue }
+        $mg = Query-Megabase -Hash $h
+        if ($mg.name) { $v += [PSCustomObject]@{ N=$mg.name; F=$jf.Name; W=$false }; continue }
     }
-    $src = Get-DownloadSource $jar.FullName
-    $unknownMods += [PSCustomObject]@{ FileName=$jar.Name; FilePath=$jar.FullName; DownloadSource=$src }
-}
-Write-Host "`r" + (" " * 80) + "`r" -NoNewline
+    $u += [PSCustomObject]@{ F=$jf.Name; S=Get-DownloadSource $jf.FullName }
+}; Write-Host "`r"+" "*80+"`r" -NoNewline
 
-Write-Host (" " * 2) + "[2/5] Content pattern scan..." -ForegroundColor DarkGray
-$seq = 0
-foreach ($jar in $jarFiles) {
-    $seq++; $m = $marks[$seq % $marks.Length]
-    Write-Host "`r  $m $seq/$totalFiles  $($jar.Name)" -NoNewline
-
-    $ve = $verifiedMods | Where-Object { $_.FileName -eq $jar.Name -and $_.ModrinthWhitelisted } | Select-Object -First 1
-    if ($ve) { continue }
-
-    $r = Invoke-ModScan -FilePath $jar.FullName
+# 2 patterns
+$i=0; Write-Host "  2/5 patterns" -ForegroundColor DarkGray
+foreach ($jf in $jarFiles) {
+    $i++; Write-Host "`r  $($sp[$i%4]) $i/$t $($jf.Name)" -NoNewline
+    if (($v|?{$_.F -eq $jf.Name -and $_.W}).Count) { continue }
+    $r = Invoke-ModScan -FilePath $jf.FullName
     if ($r.Patterns.Count -gt 0 -or $r.Strings.Count -gt 0 -or $r.Fullwidth.Count -gt 0) {
-        $suspiciousMods += [PSCustomObject]@{ FileName=$jar.Name; Patterns=$r.Patterns; Strings=$r.Strings; Fullwidth=$r.Fullwidth }
-        $verifiedMods = $verifiedMods | Where-Object { $_.FileName -ne $jar.Name }
+        $s += [PSCustomObject]@{ F=$jf.Name; P=$r.Patterns; Str=$r.Strings; Fw=$r.Fullwidth }
+        $v = $v|?{$_.F -ne $jf.Name}
     }
-}
-Write-Host "`r" + (" " * 80) + "`r" -NoNewline
+}; Write-Host "`r"+" "*80+"`r" -NoNewline
 
-Write-Host (" " * 2) + "[3/5] Bypass / injection check..." -ForegroundColor DarkGray
-$seq = 0
-foreach ($jar in $jarFiles) {
-    $seq++; $m = $marks[$seq % $marks.Length]
-    Write-Host "`r  $m $seq/$totalFiles  $($jar.Name)" -NoNewline
+# 3 bypass
+$i=0; Write-Host "  3/5 bypass" -ForegroundColor DarkGray
+foreach ($jf in $jarFiles) {
+    $i++; Write-Host "`r  $($sp[$i%4]) $i/$t $($jf.Name)" -NoNewline
+    if (($v|?{$_.F -eq $jf.Name -and $_.W}).Count) { continue }
+    $bf = Invoke-BypassScan -FilePath $jf.FullName
+    if ($bf.Count) { $b += [PSCustomObject]@{ F=$jf.Name; Fl=$bf }; $v=$v|?{$_.F -ne $jf.Name}; $u=$u|?{$_.F -ne $jf.Name} }
+}; Write-Host "`r"+" "*80+"`r" -NoNewline
 
-    $ve = $verifiedMods | Where-Object { $_.FileName -eq $jar.Name -and $_.ModrinthWhitelisted } | Select-Object -First 1
-    if ($ve) { continue }
-
-    $bf = Invoke-BypassScan -FilePath $jar.FullName
-    if ($bf.Count -gt 0) {
-        $bypassMods += [PSCustomObject]@{ FileName=$jar.Name; Flags=$bf }
-        $verifiedMods = $verifiedMods | Where-Object { $_.FileName -ne $jar.Name }
-        $unknownMods  = $unknownMods  | Where-Object { $_.FileName -ne $jar.Name }
+# 4 obf
+$i=0; Write-Host "  4/5 obfuscation" -ForegroundColor DarkGray
+foreach ($jf in $jarFiles) {
+    $i++; Write-Host "`r  $($sp[$i%4]) $i/$t $($jf.Name)" -NoNewline
+    $of = Invoke-ObfuscationScan -FilePath $jf.FullName
+    if ($of.Count) {
+        $af = ($s|?{$_.F -eq $jf.Name}).Count -gt 0 -or ($b|?{$_.F -eq $jf.Name}).Count -gt 0
+        if (-not $af) { $o += [PSCustomObject]@{ F=$jf.Name; Fl=$of }; $v=$v|?{$_.F -ne $jf.Name} }
     }
-}
-Write-Host "`r" + (" " * 80) + "`r" -NoNewline
+}; Write-Host "`r"+" "*80+"`r" -NoNewline
 
-Write-Host (" " * 2) + "[4/5] Obfuscation analysis..." -ForegroundColor DarkGray
-$seq = 0
-foreach ($jar in $jarFiles) {
-    $seq++; $m = $marks[$seq % $marks.Length]
-    Write-Host "`r  $m $seq/$totalFiles  $($jar.Name)" -NoNewline
+# 5 jvm
+Write-Host "  5/5 jvm" -ForegroundColor DarkGray
+$j = Invoke-JvmScan
+Write-Host "  done" -ForegroundColor DarkGray
 
-    $of = Invoke-ObfuscationScan -FilePath $jar.FullName
-    if ($of.Count -gt 0) {
-        $af = ($suspiciousMods | Where-Object { $_.FileName -eq $jar.Name }).Count -gt 0 -or
-              ($bypassMods     | Where-Object { $_.FileName -eq $jar.Name }).Count -gt 0
-        if (-not $af) {
-            $obfuscatedMods += [PSCustomObject]@{ FileName=$jar.Name; Flags=$of }
-            $verifiedMods = $verifiedMods | Where-Object { $_.FileName -ne $jar.Name }
-        }
-    }
-}
-Write-Host "`r" + (" " * 80) + "`r" -NoNewline
+# results
+Write-Host ""; Write-Host ("." * 50) -ForegroundColor DarkGray; Write-Host ""
 
-Write-Host (" " * 2) + "[5/5] JVM process scan..." -ForegroundColor DarkGray
-$jvmFlags = Invoke-JvmScan
-Write-Host if ($jvmFlags.Count -gt 0) { "  -> $($jvmFlags.Count) issue(s)" } else { "  -> clean" }
-Write-Host ""
+if ($v) { Write-Host "  OK ($($v.Count))" -ForegroundColor Green; $v|%{ Write-Host "    $($_.N) -> $($_.F)" -ForegroundColor DarkGray }; Write-Host "" }
+if ($u) { Write-Host "  ?? ($($u.Count))" -ForegroundColor Yellow; $u|%{ $x=if($_.S){" src:$($_.S)"}else{""}; Write-Host "    $($_.F)$x" -ForegroundColor Yellow }; Write-Host "" }
+if ($s) { Write-Host "  !! FLAGGED ($($s.Count))" -ForegroundColor Red; $s|%{
+    Write-Host "    > $($_.F)" -ForegroundColor Red
+    $ps=$_.P; $_.P|%{ Write-Host "      p: $_" -ForegroundColor Red }
+    $_.Str|?{$ps -notcontains $_}|%{ Write-Host "      s: $_" -ForegroundColor DarkYellow }
+    $_.Fw|%{ Write-Host "      fw: $_" -ForegroundColor Cyan }
+  }; Write-Host "" }
+if ($b) { Write-Host "  ## INJECTION ($($b.Count))" -ForegroundColor Magenta; $b|%{
+    Write-Host "    > $($_.F)" -ForegroundColor Magenta; $_.Fl|%{ Write-Host "      $_" -ForegroundColor White }
+  }; Write-Host "" }
+if ($o) { Write-Host "  %% OBFUSCATED ($($o.Count))" -ForegroundColor DarkYellow; $o|%{
+    Write-Host "    > $($_.F)" -ForegroundColor DarkYellow; $_.Fl|%{ Write-Host "      $_" -ForegroundColor Gray }
+  }; Write-Host "" }
+if ($j) { Write-Host "  JVM ($($j.Count))" -ForegroundColor Yellow; $j|%{ Write-Host "    $_" -ForegroundColor Yellow }; Write-Host "" }
 
-if ($verifiedMods.Count -gt 0) {
-    Write-H "VERIFIED" $verifiedMods.Count "Green"
-    Write-Sep
-    foreach ($mod in $verifiedMods) {
-        Write-Host (" " * 4) + "+ $($mod.ModName) -> $($mod.FileName)" -ForegroundColor DarkGray
-    }
-    Write-Host ""
-}
-
-if ($unknownMods.Count -gt 0) {
-    Write-H "UNKNOWN" $unknownMods.Count "Yellow"
-    Write-Sep
-    foreach ($mod in $unknownMods) {
-        $src = if ($mod.DownloadSource) { " (src: $($mod.DownloadSource))" } else { "" }
-        Write-Host (" " * 4) + "? $($mod.FileName)$src" -ForegroundColor Yellow
-    }
-    Write-Host ""
-}
-
-if ($suspiciousMods.Count -gt 0) {
-    Write-H "FLAGGED" $suspiciousMods.Count "Red"
-    foreach ($mod in $suspiciousMods) { Write-SusCard $mod }
-}
-
-if ($bypassMods.Count -gt 0) {
-    Write-H "INJECTION" $bypassMods.Count "Magenta"
-    foreach ($mod in $bypassMods) { Write-InjCard $mod }
-}
-
-if ($obfuscatedMods.Count -gt 0) {
-    Write-H "OBFUSCATED" $obfuscatedMods.Count "DarkYellow"
-    foreach ($mod in $obfuscatedMods) { Write-ObfCard $mod }
-}
-
-if ($jvmFlags.Count -gt 0) {
-    Write-H "JVM ISSUES" $jvmFlags.Count "Yellow"
-    Write-Sep
-    foreach ($fl in $jvmFlags) { Write-Host (" " * 4) + "- $fl" -ForegroundColor Yellow }
-    Write-Host ""
-}
-
-Write-Host ""; Write-Sep "=" 60; Write-Host ""
-Write-Host (" " * 3) + "Scanned: $totalFiles  |  OK: $($verifiedMods.Count)  ?: $($unknownMods.Count)  !: $($suspiciousMods.Count)  #: $($bypassMods.Count)  %: $($obfuscatedMods.Count)  JVM: $($jvmFlags.Count)" -ForegroundColor Gray
-Write-Sep "=" 60; Write-Host ""
-Write-Host (" " * 3) + "Done — press any key" -ForegroundColor DarkGray
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host ("." * 50) -ForegroundColor DarkGray; Write-Host ""
+Write-Host "  scanned:$t ok:$($v.Count) unk:$($u.Count) bad:$($s.Count) inj:$($b.Count) obf:$($o.Count) jvm:$($j.Count)" -ForegroundColor Gray
+Write-Host "  any key to exit" -ForegroundColor DarkGray; $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
