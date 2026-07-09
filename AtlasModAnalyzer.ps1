@@ -946,14 +946,35 @@ Write-Host ("  -> " + $(if ($j.Count -gt 0) { "$($j.Count) issue(s)" } else { "c
 
 # results
 Write-Host ""
+Write-Host (" " * 2) + ("=" * 42) -ForegroundColor DarkGray
 
-if ($v) { $v|%{ Write-Host "  [$($_.N)]" -ForegroundColor Green -NoNewline; Write-Host " $($_.F)" -ForegroundColor DarkGray } }
-if ($u) { $u|%{ $x=if($_.S){" ($($_.S))"}else{""}; Write-Host "  [?]$($_.F)$x" -ForegroundColor Yellow } }
-if ($s) { $s|%{ Write-Host "  [!] $($_.F)" -ForegroundColor Red; $ps=$_.P; $_.P|%{ Write-Host "    p:$_" -ForegroundColor Red }; $_.Str|?{$ps -notcontains $_}|%{ Write-Host "    s:$_" -ForegroundColor DarkYellow }; $_.Fw|%{ Write-Host "    fw:$_" -ForegroundColor Cyan } } }
-if ($b) { $b|%{ Write-Host "  [#] $($_.F)" -ForegroundColor Magenta; $_.Fl|%{ Write-Host "    $_" -ForegroundColor White } } }
-if ($o) { $o|%{ Write-Host "  [%] $($_.F)" -ForegroundColor DarkYellow; $_.Fl|%{ Write-Host "    $_" -ForegroundColor Gray } } }
-if ($j) { $j|%{ Write-Host "  [JVM] $_" -ForegroundColor Yellow } }
+if ($v) {
+    Write-Host (" " * 3) + "OK ($($v.Count))" -ForegroundColor Green
+    $v|%{ Write-Host (" " * 5) + "$($_.N)".PadRight(28) + "$($_.F)" -ForegroundColor DarkGray }
+    Write-Host " "
+}
+if ($u) {
+    Write-Host (" " * 3) + "UNKNOWN ($($u.Count))" -ForegroundColor Yellow
+    $u|%{ $x=if($_.S){"  ($($_.S))"}else{""}; Write-Host (" " * 5) + "? $($_.F)$x" -ForegroundColor Yellow }
+    Write-Host " "
+}
+if ($s) {
+    Write-Host (" " * 3) + "FLAGGED ($($s.Count))" -ForegroundColor Red
+    $s|%{ Write-Host (" " * 5) + "! $($_.F)" -ForegroundColor Red; $ps=$_.P; $_.P|%{ Write-Host (" " * 7) + "p: $_" -ForegroundColor Red }; $_.Str|?{$ps -notcontains $_}|%{ Write-Host (" " * 7) + "s: $_" -ForegroundColor DarkYellow }; $_.Fw|%{ Write-Host (" " * 7) + "fw: $_" -ForegroundColor Cyan }; Write-Host " " }
+}
+if ($b) {
+    Write-Host (" " * 3) + "INJECTION ($($b.Count))" -ForegroundColor Magenta
+    $b|%{ Write-Host (" " * 5) + "# $($_.F)" -ForegroundColor Magenta; $_.Fl|%{ Write-Host (" " * 7) + "$_" -ForegroundColor White }; Write-Host " " }
+}
+if ($o) {
+    Write-Host (" " * 3) + "OBFUSCATED ($($o.Count))" -ForegroundColor DarkYellow
+    $o|%{ Write-Host (" " * 5) + "% $($_.F)" -ForegroundColor DarkYellow; $_.Fl|%{ Write-Host (" " * 7) + "$_" -ForegroundColor Gray }; Write-Host " " }
+}
+if ($j) {
+    Write-Host (" " * 3) + "JVM ($($j.Count))" -ForegroundColor Yellow
+    $j|%{ Write-Host (" " * 5) + "$_" -ForegroundColor Yellow }; Write-Host " "
+}
 
-Write-Host ""; Write-Host "-"*40 -ForegroundColor DarkGray
-Write-Host "  S:$t OK:$($v.Count) ?:$($u.Count) !:$($s.Count) #:$($b.Count) %:$($o.Count) JVM:$($j.Count)" -ForegroundColor Gray
-Write-Host "  any key" -ForegroundColor DarkGray; $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host (" " * 2) + ("=" * 42) -ForegroundColor DarkGray
+Write-Host (" " * 3) + "S:$t  OK:$($v.Count)  ?:$($u.Count)  !:$($s.Count)  #:$($b.Count)  %:$($o.Count)  JVM:$($j.Count)" -ForegroundColor Gray
+Write-Host (" " * 3) + "any key" -ForegroundColor DarkGray; $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
