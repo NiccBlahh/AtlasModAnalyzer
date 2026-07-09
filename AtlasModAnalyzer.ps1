@@ -391,7 +391,7 @@ $cheatStrings = @(
 )
 
 $patternRegex = [regex]::new(
-    '(?<![A-Za-z])(' + ($suspiciousPatterns -join '|') + ')(?![A-Za-z])',
+    ('(?<![A-Za-z])(' + ($suspiciousPatterns -join '|') + ')(?![A-Za-z])'),
     [System.Text.RegularExpressions.RegexOptions]::Compiled
 )
 
@@ -448,26 +448,22 @@ function Get-JavaClassStrings {
                     [void]$strings.Add($str)
                     $i++
                 }
-                3 -or 4 { # Integer, Float
-                    $null = $reader.ReadBytes(4)
-                    $i++
-                }
-                5 -or 6 { # Long, Double (take up two slots in pool)
-                    $null = $reader.ReadBytes(8)
-                    $i += 2
-                }
-                7 -or 8 -or 16 -or 19 -or 20 { # Class, String, MethodType, Module, Package
-                    $null = $reader.ReadBytes(2)
-                    $i++
-                }
-                9 -or 10 -or 11 -or 12 -or 17 -or 18 { # Fieldref, Methodref, InterfaceMethodref, NameAndType, Dynamic, InvokeDynamic
-                    $null = $reader.ReadBytes(4)
-                    $i++
-                }
-                15 { # MethodHandle
-                    $null = $reader.ReadBytes(3)
-                    $i++
-                }
+                3 { $null = $reader.ReadBytes(4); $i++ }
+                4 { $null = $reader.ReadBytes(4); $i++ }
+                5 { $null = $reader.ReadBytes(8); $i += 2 }
+                6 { $null = $reader.ReadBytes(8); $i += 2 }
+                7 { $null = $reader.ReadBytes(2); $i++ }
+                8 { $null = $reader.ReadBytes(2); $i++ }
+                16 { $null = $reader.ReadBytes(2); $i++ }
+                19 { $null = $reader.ReadBytes(2); $i++ }
+                20 { $null = $reader.ReadBytes(2); $i++ }
+                9 { $null = $reader.ReadBytes(4); $i++ }
+                10 { $null = $reader.ReadBytes(4); $i++ }
+                11 { $null = $reader.ReadBytes(4); $i++ }
+                12 { $null = $reader.ReadBytes(4); $i++ }
+                17 { $null = $reader.ReadBytes(4); $i++ }
+                18 { $null = $reader.ReadBytes(4); $i++ }
+                15 { $null = $reader.ReadBytes(3); $i++ }
                 default {
                     # Stop parsing on unknown tags and fallback
                     throw "Unknown CP tag: $tag"
@@ -574,32 +570,34 @@ function Invoke-ModScan {
             $name = $entry.FullName
             foreach ($m in $patternRegex.Matches($name)) { [void]$foundPatterns.Add($m.Value) }
 
-            try {
-                $st = $entry.Open()
-                $ms2 = New-Object System.IO.MemoryStream
-                $st.CopyTo($ms2); $st.Close()
-                $bytes = $ms2.ToArray(); $ms2.Dispose()
+            if ($name -match '\.(class|json)$' -or $name -match 'MANIFEST\.MF') {
+                try {
+                    $st = $entry.Open()
+                    $ms2 = New-Object System.IO.MemoryStream
+                    $st.CopyTo($ms2); $st.Close()
+                    $bytes = $ms2.ToArray(); $ms2.Dispose()
 
-                # Robust extraction of exact strings using Java Constant Pool parser
-                $extractedStrings = Get-JavaClassStrings -Bytes $bytes
+                    # Robust extraction of exact strings using Java Constant Pool parser
+                    $extractedStrings = Get-JavaClassStrings -Bytes $bytes
 
-                foreach ($str in $extractedStrings) {
-                    # Scan strings for suspicious patterns
-                    foreach ($m in $patternRegex.Matches($str)) { [void]$foundPatterns.Add($m.Value) }
+                    foreach ($str in $extractedStrings) {
+                        # Scan strings for suspicious patterns
+                        foreach ($m in $patternRegex.Matches($str)) { [void]$foundPatterns.Add($m.Value) }
 
-                    # Match with cheat strings (case-insensitive)
-                    foreach ($s in $cheatStringSet) {
-                        if ($str.IndexOf($s, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                            [void]$foundStrings.Add($s)
+                        # Match with cheat strings (case-insensitive)
+                        foreach ($s in $cheatStringSet) {
+                            if ($str.IndexOf($s, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                                [void]$foundStrings.Add($s)
+                            }
+                        }
+
+                        # Match fullwidth characters
+                        foreach ($m in $fullwidthRegex.Matches($str)) {
+                            [void]$foundFullwidth.Add($m.Value)
                         }
                     }
-
-                    # Match fullwidth characters
-                    foreach ($m in $fullwidthRegex.Matches($str)) {
-                        [void]$foundFullwidth.Add($m.Value)
-                    }
-                }
-            } catch { }
+                } catch { }
+            }
         }
 
         foreach ($ia in $innerArchives) { try { $ia.Dispose() } catch { } }
@@ -957,8 +955,10 @@ function Invoke-JvmScan {
     $javaPid = ($javaProc | Select-Object -First 1).Id
 
     try {
-        $wmi     = Get-WmiObject Win32_Process -Filter "ProcessId = $javaPid" -ErrorAction Stop
-        $cmdLine = $wmi.CommandLine
+        $cmdLine = (Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $javaPid" -ErrorAction SilentlyContinue).CommandLine
+        if (-not $cmdLine) {
+            $cmdLine = (Get-WmiObject Win32_Process -Filter "ProcessId = $javaPid" -ErrorAction SilentlyContinue).CommandLine
+        }
 
         if ($cmdLine) {
             $agentMatches = [regex]::Matches($cmdLine, '-javaagent:([^\s"]+)')
@@ -1047,7 +1047,7 @@ Write-Host "  [2/5] Scanning file signatures & strings..." -ForegroundColor Dark
 foreach ($jf in $jarFiles) {
     $i++
     Write-Host "`r  $($spinner[$i % 4]) $i/$total $($jf.Name)" -NoNewline
-    if (($verifiedMods | Where-Object { $_.F -eq $jf.Name -and $_.W }).Count) { continue }
+    if (($verifiedMods | Where-Object { $_.F -eq $jf.Name }).Count) { continue }
     $r = Invoke-ModScan -FilePath $jf.FullName
     if ($r.Patterns.Count -gt 0 -or $r.Strings.Count -gt 0 -or $r.Fullwidth.Count -gt 0) {
         $suspiciousMods += [PSCustomObject]@{ F = $jf.Name; P = $r.Patterns; Str = $r.Strings; Fw = $r.Fullwidth }
@@ -1062,7 +1062,7 @@ Write-Host "  [3/5] Checking sandbox/bypass vectors..." -ForegroundColor DarkGra
 foreach ($jf in $jarFiles) {
     $i++
     Write-Host "`r  $($spinner[$i % 4]) $i/$total $($jf.Name)" -NoNewline
-    if (($verifiedMods | Where-Object { $_.F -eq $jf.Name -and $_.W }).Count) { continue }
+    if (($verifiedMods | Where-Object { $_.F -eq $jf.Name }).Count) { continue }
     $bf = Invoke-BypassScan -FilePath $jf.FullName
     if ($bf.Count) {
         $bypassMods += [PSCustomObject]@{ F = $jf.Name; Fl = $bf }
@@ -1078,6 +1078,7 @@ Write-Host "  [4/5] Analyzing obfuscation footprint..." -ForegroundColor DarkGra
 foreach ($jf in $jarFiles) {
     $i++
     Write-Host "`r  $($spinner[$i % 4]) $i/$total $($jf.Name)" -NoNewline
+    if (($verifiedMods | Where-Object { $_.F -eq $jf.Name }).Count) { continue }
     $of = Invoke-ObfuscationScan -FilePath $jf.FullName
     if ($of.Count) {
         $isFlagged = ($suspiciousMods | Where-Object { $_.F -eq $jf.Name }).Count -gt 0 -or ($bypassMods | Where-Object { $_.F -eq $jf.Name }).Count -gt 0
