@@ -1,196 +1,77 @@
-Add-Type -AssemblyName PresentationFramework
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.IO.Compression.FileSystem
 $ErrorActionPreference = "SilentlyContinue"
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-[xml]$xaml = @"
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Atlas Mod Analyzer" Height="780" Width="900" WindowStartupLocation="CenterScreen"
-        Background="#1E1E1E">
-    <Window.Resources>
-        <!-- Flat Button Style -->
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="#333333"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="15,8"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#444444"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#222222"/>
-                </Trigger>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Background" Value="#2A2A2A"/>
-                    <Setter Property="Foreground" Value="#777777"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+$Host.UI.RawUI.WindowTitle = "Atlas Mod Analyzer"
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
-        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="#007ACC"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#0098FF"/>
-                </Trigger>
-                <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#005A9E"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="#C62828"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E53935"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#252526"/>
-            <Setter Property="Foreground" Value="#CCCCCC"/>
-            <Setter Property="BorderBrush" Value="#3E3E42"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontFamily" Value="Segoe UI"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="8"/>
-        </Style>
-    </Window.Resources>
-
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <!-- Top Section: Centered Controls -->
-        <StackPanel Grid.Row="0" HorizontalAlignment="Center" Margin="0,20,0,30">
-            <TextBlock Text="ATLAS MOD ANALYZER" Foreground="#E0E0E0" FontFamily="Segoe UI" FontSize="24" FontWeight="Light" HorizontalAlignment="Center" Margin="0,0,0,20"/>
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,15">
-                <TextBlock Text="Target Path:" Foreground="#AAAAAA" FontFamily="Segoe UI" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <TextBox Name="txtPath" Width="380" Text="$env:USERPROFILE\AppData\Roaming\.minecraft\mods" VerticalAlignment="Center"/>
-                <Button Name="btnBrowse" Content="Browse..." Margin="10,0,0,0" VerticalAlignment="Center"/>
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <Button Name="btnScan" Style="{StaticResource PrimaryButton}" Content="START SCAN" FontSize="16" Padding="40,12"/>
-                <Button Name="btnStop" Style="{StaticResource DangerButton}" Content="STOP" FontSize="16" Padding="30,12" Margin="10,0,0,0" IsEnabled="False"/>
-                <Button Name="btnSave" Content="Save Report..." FontSize="14" Padding="20,12" Margin="10,0,0,0" IsEnabled="False"/>
-            </StackPanel>
-        </StackPanel>
-
-        <!-- Output Area -->
-        <Border Grid.Row="1" Background="#111111" BorderBrush="#3E3E42" BorderThickness="1" CornerRadius="4">
-            <RichTextBox Name="rtbOutput" Background="Transparent" Foreground="#CCCCCC" BorderThickness="0" FontFamily="Consolas" FontSize="13" Margin="5" IsReadOnly="True" VerticalScrollBarVisibility="Auto">
-                <FlowDocument Name="flowDoc">
-                    <Paragraph Margin="0">
-                        <Run Text="Ready." Foreground="#888888"/>
-                    </Paragraph>
-                </FlowDocument>
-            </RichTextBox>
-        </Border>
-
-        <!-- Status Bar -->
-        <TextBlock Name="lblStatus" Grid.Row="2" Text="Idle." Foreground="#888888" FontFamily="Segoe UI" FontSize="12" Margin="0,10,0,0"/>
-    </Grid>
-</Window>
+$banner = @"
+  _____   __  .__                     _____             .___
+  /  _  \_/  |_|  | _____    ______   /     \   ____   __| _/
+ /  /_\  \   __\  | \__  \  /  ___/  /  \ /  \ /  _ \ / __ |
+/    |    \  | |  |__/ __ \_\___ \  /    Y    (  <_> ) /_/ |
+\____|__  /__| |____(____  /____  > \____|__  /\____/\____ |
+        \/               \/     \/          \/            \/
+        _____                .__         __________
+       /  _  \   ____ _____  |  | ___.__.\____    /___________
+      /  /_\  \ /    \\__  \ |  |<   |  |  /     // __ \_  __ \
+     /    |    \   |  \/ __ \|  |_\___  | /     /\  ___/|  | \/
+     \____|__  /___|  (____  /____/ ____|/_______ \___  >__|
+             \/     \/     \/     \/             \/   \/
 "@
 
-$reader = (New-Object System.Xml.XmlNodeReader $xaml)
-$Form = [Windows.Markup.XamlReader]::Load($reader)
+function Show-Banner {
+    Clear-Host
+    Write-Host $banner -ForegroundColor Cyan
+    Write-Host "               Minecraft Mod / Cheat-Client Scanner" -ForegroundColor DarkCyan
+    Write-Host ("=" * 66) -ForegroundColor DarkGray
+    Write-Host ""
+}
 
-$txtPath   = $Form.FindName("txtPath")
-$btnBrowse = $Form.FindName("btnBrowse")
-$btnScan   = $Form.FindName("btnScan")
-$btnStop   = $Form.FindName("btnStop")
-$btnSave   = $Form.FindName("btnSave")
-$rtbOutput = $Form.FindName("rtbOutput")
-$lblStatus = $Form.FindName("lblStatus")
-$flowDoc   = $Form.FindName("flowDoc")
+$global:stopScan    = $false
+$global:reportLines = [System.Collections.Generic.List[string]]::new()
 
-$global:stopScan     = $false
-$global:closePending = $false
-$global:isScanning   = $false
-$global:reportLines  = [System.Collections.Generic.List[string]]::new()
-
-$Form.Add_Closing({
-    param($sender, $e)
-    if ($global:isScanning) {
-        $e.Cancel = $true
-        $global:stopScan = $true
-        $global:closePending = $true
-    }
-})
-
-function Append-Log {
-    param([string]$text, [string]$color="#CCCCCC", [switch]$Bold)
-    if ($global:stopScan) { return }
-    try {
-        [void]$global:reportLines.Add($text)
-        $brush = (New-Object System.Windows.Media.BrushConverter).ConvertFromString($color)
-        $run = New-Object System.Windows.Documents.Run($text + "`r`n")
-        $run.Foreground = $brush
-        if ($Bold) { $run.FontWeight = [System.Windows.FontWeights]::Bold }
-        $paragraph = New-Object System.Windows.Documents.Paragraph($run)
-        $paragraph.Margin = New-Object System.Windows.Thickness(0)
-        $flowDoc.Blocks.Add($paragraph)
-        $rtbOutput.ScrollToEnd()
-        [System.Windows.Forms.Application]::DoEvents()
-    } catch {
-        $global:stopScan = $true
+# Map the hex colors the tool used to reason about severity into
+# ConsoleColor equivalents (plain terminals don't do arbitrary hex).
+function Get-ConsoleColorForHex {
+    param([string]$hex)
+    switch ($hex) {
+        "#64B5F6" { return "Cyan" }
+        "#00FFFF" { return "Cyan" }
+        "#AAAAAA" { return "DarkGray" }
+        "#888888" { return "DarkGray" }
+        "#9E9E9E" { return "Gray" }
+        "#CCCCCC" { return "Gray" }
+        "#E53935" { return "Red" }
+        "#EF5350" { return "Red" }
+        "#FFB74D" { return "Yellow" }
+        "#FFF176" { return "Yellow" }
+        "#81C784" { return "Green" }
+        "#FFFFFF" { return "White" }
+        default   { return "Gray" }
     }
 }
 
-$btnBrowse.Add_Click({
-    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dialog.SelectedPath = $txtPath.Text
-    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $txtPath.Text = $dialog.SelectedPath
-    }
-})
+function Append-Log {
+    param([string]$text, [string]$color = "#CCCCCC", [switch]$Bold)
+    if ($global:stopScan) { return }
+    [void]$global:reportLines.Add($text)
+    $cc = Get-ConsoleColorForHex $color
+    Write-Host $text -ForegroundColor $cc
+}
 
-$btnStop.Add_Click({
-    $global:stopScan = $true
-    $lblStatus.Text = "Stopping..."
-})
-
-$btnSave.Add_Click({
-    $dialog = New-Object System.Windows.Forms.SaveFileDialog
-    $dialog.Filter = "Text file (*.txt)|*.txt"
-    $dialog.FileName = "AtlasScanReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
-    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        try {
-            $global:reportLines | Out-File -FilePath $dialog.FileName -Encoding UTF8
-            $lblStatus.Text = "Report saved to $($dialog.FileName)"
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Failed to save report: $($_.Exception.Message)") | Out-Null
+# Non-blocking check for the user pressing Q to abort a running scan.
+function Test-StopRequested {
+    try {
+        if ($Host.UI.RawUI.KeyAvailable) {
+            $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            if ($key.Character -eq 'q' -or $key.Character -eq 'Q') {
+                $global:stopScan = $true
+            }
         }
-    }
-})
+    } catch { }
+}
 
 # ---------- PATTERN LISTS ----------
-# NOTE: lists are de-duplicated at load time below, so repeated entries here are harmless
-# (kept for readability / provenance) but do not bloat the compiled regex or hash set.
 $suspiciousPatterns = @(
     "AimAssist", "AnchorTweaks", "AutoAnchor", "AutoCrystal", "AutoDoubleHand", "JDWP.VirtualMachine.AllModules",
     "AutoHitCrystal", "AutoPot", "AutoTotem", "AutoArmor", "InventoryTotem",
@@ -494,20 +375,22 @@ $cheatStrings = @(
     "Xenon", "XenonClient", "xenon client",
     "GrimClient", "grim client",
     "phantom-refmap.json",
-    "dqrkis.xyz", "Dqrkis Client"
+    "dqrkis.xyz", "Dqrkis Client",
+
+    "activateKey", "checkPlace", "switchDelay", "switchChance",
+    "placeDelay", "placeChance", "workWithTotem", "workWithCrystal",
+    "clickSimulation", "swordSwapplayersOnly", "requireClick",
+    "visibilityCheck", "targetLock", "switchTargetKey",
+    "minSpeed", "maxSpeed", "randomize", "targetBone", "weaponOnly",
+    "lockedTarget", "switchKeyWasPressed", "lastFrame", "smoothTargetPos",
+    "S.afe hor", "Action Speed", "Switch Wait Time", "Totem Sl",
+    "Rotation Sp", "Use Easing", "Easing S", "chestplate"
 )
 
-# De-duplicate once at load time. This shrinks the compiled alternation regex
-# (fewer branches = faster matching) and keeps the hash-set lookup clean,
-# without requiring the lists above to be hand-curated for duplicates.
 $suspiciousPatterns = @($suspiciousPatterns | Select-Object -Unique)
 $cheatStrings       = @($cheatStrings       | Select-Object -Unique)
 
 $fullwidthRegex = [regex]::new("[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}", [System.Text.RegularExpressions.RegexOptions]::Compiled)
-
-# Escape each literal before joining into the alternation so that patterns
-# containing regex metacharacters (e.g. the dots in "org.chainlibs...") are
-# matched literally instead of "." meaning "any character".
 $escapedPatterns = $suspiciousPatterns | ForEach-Object { [regex]::Escape($_) }
 $patternRegex = [regex]::new('(?<![A-Za-z])(' + ($escapedPatterns -join '|') + ')(?![A-Za-z])', [System.Text.RegularExpressions.RegexOptions]::Compiled)
 
@@ -526,12 +409,8 @@ function Invoke-ModScan {
         $archive = [System.IO.Compression.ZipFile]::OpenRead($FilePath)
         $allEntries = [System.Collections.Generic.List[object]]::new()
 
-        $entryCount = 0
         foreach ($entry in $archive.Entries) {
             if ($global:stopScan) { return @{ Patterns = $foundPatterns; Strings = $foundStrings; Fullwidth = $foundFullwidth } }
-            $entryCount++
-            if ($entryCount % 25 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
-
             foreach ($m in $patternRegex.Matches($entry.FullName)) { [void]$foundPatterns.Add($m.Value) }
             $allEntries.Add($entry)
 
@@ -546,12 +425,8 @@ function Invoke-ModScan {
             }
         }
 
-        $entryCount = 0
         foreach ($entry in $allEntries) {
             if ($global:stopScan) { return @{ Patterns = $foundPatterns; Strings = $foundStrings; Fullwidth = $foundFullwidth } }
-            $entryCount++
-            if ($entryCount % 25 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
-
             $name = $entry.FullName
             if ($name -match '\.(class|json)$' -or $name -match 'MANIFEST\.MF') {
                 try {
@@ -570,8 +445,6 @@ function Invoke-ModScan {
             }
         }
     } catch {
-        # Locked/corrupt/non-zip jar - surface nothing rather than silently
-        # pretending the file was clean.
         [void]$foundStrings.Add("[scan error: $($_.Exception.Message)]")
     } finally {
         foreach ($ia in $innerArchives) { try { $ia.Dispose() } catch { } }
@@ -639,12 +512,8 @@ function Invoke-ObfuscationScan {
             "JavaCrack"      = @("javamc.obf","MCrack","mcObfuscator")
         }
 
-        $entryCount = 0
         foreach ($entry in $archive.Entries) {
             if ($global:stopScan) { return $flags }
-            $entryCount++
-            if ($entryCount % 25 -eq 0) { [System.Windows.Forms.Application]::DoEvents() }
-
             $name = $entry.FullName
             if ($name -match "\.class$") {
                 $totalClass++
@@ -797,9 +666,6 @@ function Invoke-JvmScan {
     foreach ($proc in $javaProcesses) {
         if ($global:stopScan) { return }
         try {
-            # Get-CimInstance replaces the deprecated Get-WmiObject: faster,
-            # works over WSMan/DCOM, and is the supported cmdlet on modern
-            # PowerShell (Get-WmiObject is gone entirely in PowerShell 7+).
             $cmdLine = (Get-CimInstance Win32_Process -Filter "ProcessId = $($proc.Id)" -ErrorAction Stop).CommandLine
             if (-not $cmdLine) { continue }
             Append-Log "  +- Process: PID $($proc.Id)" "#81C784"
@@ -827,81 +693,46 @@ function Invoke-JvmScan {
     }
 }
 
-# --- BUTTON CLICK HANDLER ---
-$btnScan.Add_Click({
-    $global:stopScan = $false
-    $global:closePending = $false
-    $global:isScanning = $true
-    $global:reportLines.Clear()
-    $btnScan.IsEnabled = $false
-    $btnStop.IsEnabled = $true
-    $btnSave.IsEnabled = $false
-    $rtbOutput.Document.Blocks.Clear()
-    $lblStatus.Text = "Scanning..."
-    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+function Invoke-FullScan {
+    param([string]$TargetPath)
 
-    # Every early-return path below must restore isScanning/button state,
-    # otherwise a closed-window race can leave the app unresponsive to
-    # further close attempts (isScanning stays true forever).
-    function Reset-ScanState {
-        $global:isScanning = $false
-        $btnScan.IsEnabled = $true
-        $btnStop.IsEnabled = $false
-        $btnSave.IsEnabled = ($global:reportLines.Count -gt 0)
-        if ($global:closePending) { $Form.Close() }
-    }
+    $global:stopScan = $false
+    $global:reportLines.Clear()
 
     Append-Log " ATLAS MOD ANALYZER SCAN STARTED" "#64B5F6" -Bold
-    Append-Log " Target: $($txtPath.Text)" "#AAAAAA"
-    if (-not (Test-Path $txtPath.Text -PathType Container)) {
+    Append-Log " Target: $TargetPath" "#AAAAAA"
+    Write-Host ""
+
+    if (-not (Test-Path $TargetPath -PathType Container)) {
         Append-Log "[!] Directory does not exist!" "#E53935" -Bold
-        $lblStatus.Text = "Idle."
-        Reset-ScanState
         return
     }
 
-    try { $jarFiles = Get-ChildItem -Path $txtPath.Text -Filter *.jar -ErrorAction Stop } catch {
+    try { $jarFiles = Get-ChildItem -Path $TargetPath -Filter *.jar -ErrorAction Stop } catch {
         Append-Log "[!] Error accessing directory." "#E53935"
-        $lblStatus.Text = "Idle."
-        Reset-ScanState
         return
     }
 
     if ($jarFiles.Count -eq 0) {
         Append-Log "[!] No JAR files found." "#FFB74D"
-        $lblStatus.Text = "Idle."
-        Reset-ScanState
         return
     }
 
     $total = $jarFiles.Count
-    Append-Log "Found $total JAR files to analyze.`r`n" "#81C784"
+    Append-Log "Found $total JAR files to analyze. (press Q at any time to stop)`r`n" "#81C784"
 
     $flaggedCount = 0
     $obfCount = 0
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
     for ($i = 0; $i -lt $total; $i++) {
+        Test-StopRequested
         if ($global:stopScan) {
             Append-Log "`r`n[STOPPED] Scan cancelled by user." "#FFB74D" -Bold
-            Reset-ScanState
             return
         }
         $jar = $jarFiles[$i]
-
-        try {
-            $lblStatus.Text = "Scanning ($($i+1)/$total): $($jar.Name)"
-            [System.Windows.Forms.Application]::DoEvents()
-        } catch {
-            $global:stopScan = $true
-            Reset-ScanState
-            return
-        }
-
-        if ($global:stopScan) {
-            Append-Log "`r`n[STOPPED] Scan cancelled by user." "#FFB74D" -Bold
-            Reset-ScanState
-            return
-        }
+        Write-Host ("  [{0}/{1}] {2}" -f ($i + 1), $total, $jar.Name) -ForegroundColor DarkGray
 
         $modRes = Invoke-ModScan -FilePath $jar.FullName
         $obfRes = Invoke-ObfuscationScan -FilePath $jar.FullName
@@ -931,19 +762,53 @@ $btnScan.Add_Click({
 
     if ($global:stopScan) {
         Append-Log "`r`n[STOPPED] Scan cancelled by user." "#FFB74D" -Bold
-        Reset-ScanState
         return
     }
 
     $stopwatch.Stop()
+    Write-Host ""
     Append-Log " SCAN COMPLETE!" "#81C784" -Bold
     Append-Log " Total Scanned: $total" "#FFFFFF"
     Append-Log " Flagged Mods:  $flaggedCount" "#E53935"
     Append-Log " Obfuscated:    $obfCount" "#FFF176"
     Append-Log " Elapsed:       $([math]::Round($stopwatch.Elapsed.TotalSeconds, 1))s" "#888888"
+}
 
-    $lblStatus.Text = "Scan Complete."
-    Reset-ScanState
-})
+# --- MAIN LOOP ---
+$defaultPath = "$env:USERPROFILE\AppData\Roaming\.minecraft\mods"
 
-$Form.ShowDialog() | Out-Null
+while ($true) {
+    Show-Banner
+
+    Write-Host "Target Path [$defaultPath]:" -ForegroundColor Gray
+    Write-Host "> " -NoNewline -ForegroundColor DarkCyan
+    $inputPath = Read-Host
+    $targetPath = if ([string]::IsNullOrWhiteSpace($inputPath)) { $defaultPath } else { $inputPath }
+
+    Write-Host ""
+    Invoke-FullScan -TargetPath $targetPath
+
+    Write-Host ""
+    Write-Host "Save report to file? (Y/N): " -NoNewline -ForegroundColor Gray
+    $saveAns = Read-Host
+    if ($saveAns -match '^(y|yes)$') {
+        $defaultName = "AtlasScanReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+        Write-Host "Save as [$defaultName]: " -NoNewline -ForegroundColor Gray
+        $fileName = Read-Host
+        if ([string]::IsNullOrWhiteSpace($fileName)) { $fileName = $defaultName }
+        try {
+            $global:reportLines | Out-File -FilePath $fileName -Encoding UTF8
+            Write-Host "Report saved to $fileName" -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to save report: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
+
+    Write-Host ""
+    Write-Host "Scan another directory? (Y/N): " -NoNewline -ForegroundColor Gray
+    $again = Read-Host
+    if ($again -notmatch '^(y|yes)$') { break }
+}
+
+Write-Host ""
+Write-Host "Exiting Atlas Mod Analyzer." -ForegroundColor DarkGray
