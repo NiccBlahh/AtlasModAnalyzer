@@ -5,18 +5,26 @@ $Host.UI.RawUI.WindowTitle = "Atlas Mod Analyzer"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
 $banner = @"
-  _____   __  .__                     _____             .___
-  /  _  \_/  |_|  | _____    ______   /     \   ____   __| _/
- /  /_\  \   __\  | \__  \  /  ___/  /  \ /  \ /  _ \ / __ |
-/    |    \  | |  |__/ __ \_\___ \  /    Y    (  <_> ) /_/ |
-\____|__  /__| |____(____  /____  > \____|__  /\____/\____ |
-        \/               \/     \/          \/            \/
-        _____                .__         __________
-       /  _  \   ____ _____  |  | ___.__.\____    /___________
-      /  /_\  \ /    \\__  \ |  |<   |  |  /     // __ \_  __ \
-     /    |    \   |  \/ __ \|  |_\___  | /     /\  ___/|  | \/
-     \____|__  /___|  (____  /____/ ____|/_______ \___  >__|
-             \/     \/     \/     \/             \/   \/
+▄▄▄     ▄▄▄█████▓ ██▓    ▄▄▄        ██████     ███▄ ▄███▓ ▒█████  ▓█████▄
+▒████▄   ▓  ██▒ ▓▒▓██▒   ▒████▄    ▒██    ▒    ▓██▒▀█▀ ██▒▒██▒  ██▒▒██▀ ██▌
+▒██  ▀█▄ ▒ ▓██░ ▒░▒██░   ▒██  ▀█▄  ░ ▓██▄      ▓██    ▓██░▒██░  ██▒░██   █▌
+░██▄▄▄▄██░ ▓██▓ ░ ▒██░   ░██▄▄▄▄██   ▒   ██▒   ▒██    ▒██ ▒██   ██░░▓█▄   ▌
+ ▓█   ▓██▒ ▒██▒ ░ ░██████▒▓█   ▓██▒▒██████▒▒   ▒██▒   ░██▒░ ████▓▒░░▒████▓
+ ▒▒   ▓▒█░ ▒ ░░   ░ ▒░▓  ░▒▒   ▓▒█░▒ ▒▓▒ ▒ ░   ░ ▒░   ░  ░░ ▒░▒░▒░  ▒▒▓  ▒
+  ▒   ▒▒ ░   ░    ░ ░ ▒  ░ ▒   ▒▒ ░░ ░▒  ░ ░   ░  ░      ░  ░ ▒ ▒░  ░ ▒  ▒
+  ░   ▒    ░        ░ ░    ░   ▒   ░  ░  ░     ░      ░   ░ ░ ░ ▒   ░ ░  ░
+      ░  ░            ░  ░     ░  ░      ░            ░       ░ ░     ░
+                                                                    ░
+                ▄▄▄       ███▄    █  ▄▄▄       ██▓   ▓██   ██▓▒███████▒▓█████  ██▀███
+               ▒████▄     ██ ▀█   █ ▒████▄    ▓██▒    ▒██  ██▒▒ ▒ ▒ ▄▀░▓█   ▀ ▓██ ▒ ██▒
+               ▒██  ▀█▄  ▓██  ▀█ ██▒▒██  ▀█▄  ▒██░     ▒██ ██░░ ▒ ▄▀▒░ ▒███   ▓██ ░▄█ ▒
+               ░██▄▄▄▄██ ▓██▒  ▐▌██▒░██▄▄▄▄██ ▒██░     ░ ▐██▓░  ▄▀▒   ░▒▓█  ▄ ▒██▀▀█▄
+                ▓█   ▓██▒▒██░   ▓██░ ▓█   ▓██▒░██████▒ ░ ██▒▓░▒███████▒░▒████▒░██▓ ▒██▒
+                ▒▒   ▓▒█░░ ▒░   ▒ ▒  ▒▒   ▓▒█░░ ▒░▓  ░  ██▒▒▒ ░▒▒ ▓░▒░▒░░ ▒░ ░░ ▒▓ ░▒▓░
+                 ▒   ▒▒ ░░ ░░   ░ ▒░  ▒   ▒▒ ░░ ░ ▒  ░▓██ ░▒░ ░░▒ ▒ ░ ▒ ░ ░  ░  ░▒ ░ ▒░
+                 ░   ▒      ░   ░ ░   ░   ▒     ░ ░   ▒ ▒ ░░  ░ ░ ░ ░ ░   ░     ░░   ░
+                     ░  ░         ░       ░  ░    ░  ░░ ░       ░ ░       ░  ░   ░
+                                                      ░ ░     ░
 "@
 
 function Show-Banner {
@@ -399,7 +407,7 @@ foreach ($s in $cheatStrings) { [void]$cheatStringSet.Add($s) }
 
 # --- SCANNER LOGIC ---
 function Invoke-ModScan {
-    param([string]$FilePath)
+    param([string]$FilePath, [switch]$DeepScan)
     $foundPatterns  = [System.Collections.Generic.HashSet[string]]::new()
     $foundStrings   = [System.Collections.Generic.HashSet[string]]::new()
     $foundFullwidth = [System.Collections.Generic.HashSet[string]]::new()
@@ -414,7 +422,11 @@ function Invoke-ModScan {
             foreach ($m in $patternRegex.Matches($entry.FullName)) { [void]$foundPatterns.Add($m.Value) }
             $allEntries.Add($entry)
 
-            if ($entry.FullName -match "^META-INF/jars/.+\.jar$") {
+            # Unpacking nested jars (Fabric/Forge "jar-in-jar" bundling) means
+            # opening and buffering each one in memory - real work, so it's
+            # deep-scan only. Normal scan still catches these by their outer
+            # META-INF/jars/*.jar entry name via the patternRegex check above.
+            if ($DeepScan -and $entry.FullName -match "^META-INF/jars/.+\.jar$") {
                 try {
                     $ns = $entry.Open(); $ms = New-Object System.IO.MemoryStream
                     $ns.CopyTo($ms); $ns.Close(); $ms.Position = 0
@@ -428,7 +440,12 @@ function Invoke-ModScan {
         foreach ($entry in $allEntries) {
             if ($global:stopScan) { return @{ Patterns = $foundPatterns; Strings = $foundStrings; Fullwidth = $foundFullwidth } }
             $name = $entry.FullName
-            if ($name -match '\.(class|json)$' -or $name -match 'MANIFEST\.MF') {
+            # Normal scan only pays the I/O cost for the manifest (small, cheap,
+            # often reveals client/loader identity). Deep scan additionally
+            # opens every .class/.json file and scans its raw bytes - that's
+            # the expensive, thorough pass.
+            $shouldRead = ($name -match 'MANIFEST\.MF') -or ($DeepScan -and $name -match '\.(class|json)$')
+            if ($shouldRead) {
                 try {
                     $st = $entry.Open(); $ms2 = New-Object System.IO.MemoryStream
                     $st.CopyTo($ms2); $st.Close()
@@ -478,7 +495,7 @@ function Invoke-ModScan {
 }
 
 function Invoke-ObfuscationScan {
-    param([string]$FilePath)
+    param([string]$FilePath, [switch]$DeepScan)
     $flags = [System.Collections.Generic.List[string]]::new()
     $archive = $null
     try {
@@ -533,7 +550,9 @@ function Invoke-ObfuscationScan {
                 }
                 $segs = ($name -replace "\.class$","") -split "/"
                 foreach ($seg in $segs[0..($segs.Count-2)]) { if ($seg.Length -eq 1) { $singleCharPkg++ } }
-                if ($sampleSize -lt 150000 -and $entry.Length -lt 100000 -and $entry.Length -gt 100) {
+                # Reading and buffering class bytes for the obfuscator/reflection
+                # fingerprinting below is the expensive part - deep scan only.
+                if ($DeepScan -and $sampleSize -lt 150000 -and $entry.Length -lt 100000 -and $entry.Length -gt 100) {
                     try {
                         $st = $entry.Open(); $ms = New-Object System.IO.MemoryStream
                         $st.CopyTo($ms); $st.Close()
@@ -560,30 +579,32 @@ function Invoke-ObfuscationScan {
         if ($confPct -ge 3) { $flags.Add("Confusion-char names (Il1O0/_) - $confPct%") }
         if ($singleCharPkg -ge 6) { $flags.Add("Single-char package paths - $singleCharPkg path segments like a/b/c") }
 
-        $sampleStr = $contentSample.ToString()
-        $fwStringMatches = [regex]::Matches($sampleStr, "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}")
-        if ($fwStringMatches.Count -gt 0) {
-            $flags.Add("Fullwidth strings in class content - $($fwStringMatches.Count) occurrences")
-        }
-
-        foreach ($obfName in $cheatObfuscators.Keys) {
-            foreach ($pat in $cheatObfuscators[$obfName]) {
-                if ($sampleStr.Contains($pat)) { $flags.Add("Known cheat obfuscator detected - $obfName (matched: $pat)"); break }
+        if ($DeepScan) {
+            $sampleStr = $contentSample.ToString()
+            $fwStringMatches = [regex]::Matches($sampleStr, "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}")
+            if ($fwStringMatches.Count -gt 0) {
+                $flags.Add("Fullwidth strings in class content - $($fwStringMatches.Count) occurrences")
             }
-        }
 
-        $obfStringPatterns = @(
-            @{Pattern='(?i)(?:string|str)_(?:obf|enc|crypt|hide|mangle)'; Label='String obfuscation methods'},
-            @{Pattern='(?i)decrypt(?:String|Str|Key|Payload)'; Label='Decryption methods present'},
-            @{Pattern='(?i)\.(?:obfuscate|deobfuscate|remap|rename)\(?\)'; Label='Obfuscation API calls'},
-            @{Pattern='(?i)(?:class|method|field)_(?:mapping|remap|rename|transform)'; Label='Runtime mapping/remap methods'}
-        )
-        foreach ($obfPat in $obfStringPatterns) {
-            if ($sampleStr -match $obfPat.Pattern) { $flags.Add("$($obfPat.Label) - matched: $($matches[0])") }
-        }
+            foreach ($obfName in $cheatObfuscators.Keys) {
+                foreach ($pat in $cheatObfuscators[$obfName]) {
+                    if ($sampleStr.Contains($pat)) { $flags.Add("Known cheat obfuscator detected - $obfName (matched: $pat)"); break }
+                }
+            }
 
-        $reflectCount = [regex]::Matches($sampleStr, '(?i)(?:getDeclaredMethod|getDeclaredField|setAccessible|invoke\s*\(|forName\s*\()').Count
-        if ($reflectCount -ge 50) { $flags.Add("Heavy reflection usage - $reflectCount reflection calls") }
+            $obfStringPatterns = @(
+                @{Pattern='(?i)(?:string|str)_(?:obf|enc|crypt|hide|mangle)'; Label='String obfuscation methods'},
+                @{Pattern='(?i)decrypt(?:String|Str|Key|Payload)'; Label='Decryption methods present'},
+                @{Pattern='(?i)\.(?:obfuscate|deobfuscate|remap|rename)\(?\)'; Label='Obfuscation API calls'},
+                @{Pattern='(?i)(?:class|method|field)_(?:mapping|remap|rename|transform)'; Label='Runtime mapping/remap methods'}
+            )
+            foreach ($obfPat in $obfStringPatterns) {
+                if ($sampleStr -match $obfPat.Pattern) { $flags.Add("$($obfPat.Label) - matched: $($matches[0])") }
+            }
+
+            $reflectCount = [regex]::Matches($sampleStr, '(?i)(?:getDeclaredMethod|getDeclaredField|setAccessible|invoke\s*\(|forName\s*\()').Count
+            if ($reflectCount -ge 50) { $flags.Add("Heavy reflection usage - $reflectCount reflection calls") }
+        }
 
     } catch { } finally {
         if ($archive) { try { $archive.Dispose() } catch { } }
@@ -694,13 +715,14 @@ function Invoke-JvmScan {
 }
 
 function Invoke-FullScan {
-    param([string]$TargetPath)
+    param([string]$TargetPath, [switch]$DeepScan)
 
     $global:stopScan = $false
     $global:reportLines.Clear()
 
     Append-Log " ATLAS MOD ANALYZER SCAN STARTED" "#64B5F6" -Bold
     Append-Log " Target: $TargetPath" "#AAAAAA"
+    Append-Log " Mode:   $(if ($DeepScan) { 'DEEP SCAN (full content + obfuscation analysis)' } else { 'NORMAL SCAN (names + manifest only)' })" "#AAAAAA"
     Write-Host ""
 
     if (-not (Test-Path $TargetPath -PathType Container)) {
@@ -734,8 +756,8 @@ function Invoke-FullScan {
         $jar = $jarFiles[$i]
         Write-Host ("  [{0}/{1}] {2}" -f ($i + 1), $total, $jar.Name) -ForegroundColor DarkGray
 
-        $modRes = Invoke-ModScan -FilePath $jar.FullName
-        $obfRes = Invoke-ObfuscationScan -FilePath $jar.FullName
+        $modRes = Invoke-ModScan -FilePath $jar.FullName -DeepScan:$DeepScan
+        $obfRes = Invoke-ObfuscationScan -FilePath $jar.FullName -DeepScan:$DeepScan
 
         $isFlagged = ($modRes.Patterns.Count -gt 0 -or $modRes.Strings.Count -gt 0 -or $modRes.Fullwidth.Count -gt 0)
         $isObfuscated = ($obfRes.Count -gt 0)
@@ -786,7 +808,15 @@ while ($true) {
     $targetPath = if ([string]::IsNullOrWhiteSpace($inputPath)) { $defaultPath } else { $inputPath }
 
     Write-Host ""
-    Invoke-FullScan -TargetPath $targetPath
+    Write-Host "Scan Mode:" -ForegroundColor Gray
+    Write-Host "  [1] Normal Scan  - fast, checks file names + manifest" -ForegroundColor Gray
+    Write-Host "  [2] Deep Scan    - slower, opens every class, checks obfuscation + reflection" -ForegroundColor Gray
+    Write-Host "> " -NoNewline -ForegroundColor DarkCyan
+    $modeAns = Read-Host
+    $useDeepScan = ($modeAns.Trim() -eq '2')
+
+    Write-Host ""
+    Invoke-FullScan -TargetPath $targetPath -DeepScan:$useDeepScan
 
     Write-Host ""
     Write-Host "Save report to file? (Y/N): " -NoNewline -ForegroundColor Gray
