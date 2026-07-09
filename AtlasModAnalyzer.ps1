@@ -1,8 +1,14 @@
-$ErrorActionPreference = "SilentlyContinue"
-Add-Type -AssemblyName System.IO.Compression.FileSystem
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+$OutputEncoding           = [System.Text.Encoding]::UTF8
+chcp 65001 | Out-Null
+Clear-Host
 
-$Host.UI.RawUI.WindowTitle = "Atlas Mod Analyzer"
-try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
+$currentFont = (Get-ItemProperty "HKCU:\Console" -ErrorAction SilentlyContinue).FaceName
+if ($currentFont -notmatch "NSimSun|Gothic|Noto") {
+    Write-Host "  Tip: To see all Unicode characters, set the terminal font to 'NSimSun'" -ForegroundColor DarkYellow
+    Write-Host
+}
 
 $banner = @"
 ▄▄▄     ▄▄▄█████▓ ██▓    ▄▄▄        ██████     ███▄ ▄███▓ ▒█████  ▓█████▄
@@ -27,56 +33,60 @@ $banner = @"
                                                       ░ ░     ░
 "@
 
-function Show-Banner {
-    Clear-Host
-    Write-Host $banner -ForegroundColor Cyan
-    Write-Host "               Minecraft Mod / Cheat-Client Scanner" -ForegroundColor DarkCyan
-    Write-Host ("=" * 66) -ForegroundColor DarkGray
-    Write-Host ""
+Write-Host $banner -ForegroundColor Cyan
+Write-Host ""
+Write-Host "                Made with " -ForegroundColor Gray -NoNewline
+Write-Host "♥ " -ForegroundColor Red -NoNewline
+Write-Host "by " -ForegroundColor Gray -NoNewline
+Write-Host "MeowTonynoh" -ForegroundColor Cyan
+Write-Host ""
+Write-Host ("━" * 76) -ForegroundColor DarkCyan
+Write-Host
+
+Write-Host "Enter path to the mods folder: " -NoNewline
+Write-Host "(press Enter to use default)" -ForegroundColor DarkGray
+$modsPath = Read-Host "PATH"
+Write-Host
+
+if ([string]::IsNullOrWhiteSpace($modsPath)) {
+    $modsPath = "$env:USERPROFILE\AppData\Roaming\.minecraft\mods"
+    Write-Host "Continuing with " -NoNewline
+    Write-Host $modsPath -ForegroundColor White
+    Write-Host
 }
 
-$global:stopScan    = $false
-$global:reportLines = [System.Collections.Generic.List[string]]::new()
-
-function Get-ConsoleColorForHex {
-    param([string]$hex)
-    switch ($hex) {
-        "#64B5F6" { return "Cyan" }
-        "#00FFFF" { return "Cyan" }
-        "#AAAAAA" { return "DarkGray" }
-        "#888888" { return "DarkGray" }
-        "#9E9E9E" { return "Gray" }
-        "#CCCCCC" { return "Gray" }
-        "#E53935" { return "Red" }
-        "#EF5350" { return "Red" }
-        "#FFB74D" { return "Yellow" }
-        "#FFF176" { return "Yellow" }
-        "#81C784" { return "Green" }
-        "#FFFFFF" { return "White" }
-        default   { return "Gray" }
-    }
+if (-not (Test-Path $modsPath -PathType Container)) {
+    Write-Host "Invalid Path!" -ForegroundColor Red
+    Write-Host "The directory does not exist or is not accessible." -ForegroundColor Yellow
+    Write-Host
+    Write-Host "Tried to access: $modsPath" -ForegroundColor Gray
+    Write-Host
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    exit 1
 }
 
-function Append-Log {
-    param([string]$text, [string]$color = "#CCCCCC", [switch]$Bold)
-    if ($global:stopScan) { return }
-    [void]$global:reportLines.Add($text)
-    $cc = Get-ConsoleColorForHex $color
-    Write-Host $text -ForegroundColor $cc
+Write-Host "Scanning directory: $modsPath" -ForegroundColor Green
+Write-Host
+
+$mcProcess = Get-Process javaw -ErrorAction SilentlyContinue
+if (-not $mcProcess) {
+    $mcProcess = Get-Process java -ErrorAction SilentlyContinue
 }
 
-function Test-StopRequested {
+if ($mcProcess) {
     try {
-        if ($Host.UI.RawUI.KeyAvailable) {
-            $key = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            if ($key.Character -eq 'q' -or $key.Character -eq 'Q') {
-                $global:stopScan = $true
-            }
-        }
+        $startTime = $mcProcess.StartTime
+        $uptime = (Get-Date) - $startTime
+        Write-Host "Minecraft Uptime" -ForegroundColor DarkCyan
+        Write-Host "   $($mcProcess.Name) PID $($mcProcess.Id) started at $startTime" -ForegroundColor Gray
+        Write-Host "   Running for: $($uptime.Hours)h $($uptime.Minutes)m $($uptime.Seconds)s" -ForegroundColor Gray
+        Write-Host ""
     } catch { }
 }
 
-# ---------- PATTERN LISTS ----------
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
 $suspiciousPatterns = @(
     "AimAssist", "AnchorTweaks", "AutoAnchor", "AutoCrystal", "AutoDoubleHand", "JDWP.VirtualMachine.AllModules",
     "AutoHitCrystal", "AutoPot", "AutoTotem", "AutoArmor", "InventoryTotem",
@@ -89,12 +99,12 @@ $suspiciousPatterns = @(
     "LagReach", "PopSwitch", "SprintReset", "ChestSteal", "AntiBot",
     "ElytraSwap", "FastXP", "FastExp", "Refill",  "AirAnchor",
     "jnativehook", "FakeInv", "HoverTotem", "AutoClicker", "AutoFirework",
-    "PackSpoof", "Antiknockback", "catlean",
+    "PackSpoof", "Antiknockback", "catlean", 
     "AuthBypass", "Asteria", "Prestige", "AutoEat", "AutoMine",
     "MaceSwap",  "Macro198", "StunSlam", "SafeAnchor", "DoubleAnchor", "AutoTPA", "BaseFinder", "Xenon", "gypsy",
-    "AutoPotRefill", "KeyPearl", "AutoNethPot", "AutoDtap",
-    "AutoWeb", "AnchorAction",
-
+    "AutoPotRefill", "WalksyOptimizer", "KeyPearl", "AimAssist", "AutoNethPot", "AutoDtap",
+    "TriggerBot", "AutoWeb", "AnchorAction",
+    
     "org.chainlibs.module.impl.modules.Crystal.Y",
     "org.chainlibs.module.impl.modules.Crystal.bF",
     "org.chainlibs.module.impl.modules.Crystal.bM",
@@ -123,41 +133,42 @@ $cheatStrings = @(
     "AutoCrystal", "autocrystal", "auto crystal", "cw crystal", "JDWP.VirtualMachine.AllModules",
     "dontPlaceCrystal", "dontBreakCrystal",
     "AutoHitCrystal", "autohitcrystal", "canPlaceCrystalServer", "healPotSlot",
-    "ＡｕｔｏＣｒｙｓｔａｌ", "Ａｕｔｏ Ｃｒｙｓｔａｌ",
-    "ＡｕｔｏＨｉｔＣｒｙｓｔａｌ",
+    "ＡｗｔｏＣｒｙｓｔａｌ", "Ａｗｔｏ Ｃｒｙｓｔａｌ",
+    "ＡｗｔｏＨｉｔＣｒｙｓｔａｌ",
     "AutoAnchor", "autoanchor", "auto anchor", "DoubleAnchor",
-    "HasAnchor", "anchortweaks", "anchor macro", "safe anchor", "safeanchor",
+     "HasAnchor", "anchortweaks", "anchor macro", "safe anchor", "safeanchor",
     "SafeAnchor", "AirAnchor",
-    "ＡｕｔｏＡｎｃｈｏｒ", "Ａｕｔｏ Ａｎｃｈｏｒ",
-    "ＤｏｕｂｌｅＡｎｃｈｏｒ", "Ｄｏｕｂｌｅ Ａｎｃｈｏｒ",
+    "ＡｗｔｏＡｎｃｈｏｒ", "Ａｗｔｏ Ａｎｃｈｏｒ",
+    "ＤｏｗｂｌｅＡｎｃｈｏｒ", "Ｄｏｗｂｌｅ Ａｎｃｈｏｒ",
     "ＳａｆｅＡｎｃｈｏｒ", "Ｓａｆｅ Ａｎｃｈｏｒ",
     "Ａｎｃｈｏｒ Ｍａｃｒｏ", "anchorMacro",
     "AutoTotem", "autototem", "auto totem", "InventoryTotem",
     "inventorytotem", "HoverTotem", "hover totem", "legittotem",
-    "ＡｕｔｏＴｏｔｅｍ", "Ａｕｔｏ Ｔｏｔｅｍ",
+    "ＡｗｔｏＴｏｔｅｍ", "Ａｗｔｏ Ｔｏｔｅｍ",
     "ＨｏｖｅｒＴｏｔｅｍ", "Ｈｏｖｅｒ Ｔｏｔｅｍ",
-    "ＩｎｖｅｎｔｏｒｙＴｏｔｅｍ", "Ａｕｔｏ Ｉｎｖｅｎｔｏｒｙ Ｔｏｔｅｍ",
-    "Ａｕｔｏ Ｔｏｔｅｍ Ｈｉｔ",
+    "ＩｎｖｅｎｔｏｒｙＴｏｔｅｍ", "Ａｗｔｏ Ｉｎｖｅｎｔｏｒｙ Ｔｏｔｅｍ",
+    "Ａｗｔｏ Ｔｏｔｅｍ Ｈｉｔ",
     "AutoPot", "autopot", "auto pot", "speedPotSlot", "strengthPotSlot",
     "AutoArmor", "autoarmor", "auto armor",
-    "ＡｕｔｏＰｏｔ", "Ａｕｔｏ Ｐｏｔ",
-    "Ａｕｔｏ Ｐｏｔ Ｒｅｆｉｌｌ", "AutoPotRefill",
-    "ＡｕｔｏＡｒｍｏｒ", "Ａｕｔｏ Ａｒｍｏｒ",
+    "ＡｗｔｏＰｏｔ", "Ａｗｔｏ Ｐｏｔ",
+    "Ａｗｔｏ Ｐｏｔ Ｒｅｆｉｌｌ", "AutoPotRefill",
+    "ＡｗｔｏＡｒｍｏｒ", "Ａｗｔｏ Ａｒｍｏｒ",
     "preventSwordBlockBreaking", "preventSwordBlockAttack",
     "ShieldDisabler", "ShieldBreaker",
     "ＳｈｉｅｌｄＤｉｓａｂｌｅｒ", "Ｓｈｉｅｌｄ Ｄｉｓａｂｌｅｒ",
     "Breaking shield with axe...",
     "AutoDoubleHand", "autodoublehand", "auto double hand",
-    "ＡｕｔｏＤｏｗｂｌｅＨａｎｄ", "Ａｕｔｏ Ｄｏｗｂｌｅ Ｈａｎｄ",
+    "ＡｗｔｏＤｏｊｂｌｅＨａｎｄ", "Ａｗｔｏ Ｄｏｊｂｌｅ Ｈａｎｄ",
     "AutoClicker",
-    "ＡｕｔｏＣｌｉｃｋｅｒ",
+    "ＡｗｔｏＣｌｉｃｋｅｒ",
     "Failed to switch to mace after axe!",
     "AutoMace", "MaceSwap", "SpearSwap",
-    "ＡｕｔｏＭａｃｅ", "Ａｕｔｏ Ｍａｃｅ",
+    "ＡｗｔｏＭａｃｅ", "Ａｗｔｏ Ｍａｃｅ",
     "ＭａｃｅＳｗａｐ", "Ｍａｃｅ Ｓｗａｐ",
-    "Ｓｐｅａｒ Ｓｗａｐ", "Ａｕｔｏｍａｔｉｃａｌｌｙ ａｘｅ ａｎｄ ｍａｃｅ ｓｈｉｅｌｄｅｄ ｐｌａｙｅｒｓ",
-    "Ｓｔｗｎ Ｓｌａｍ", "StunSlam",
+    "Ｓｐｅａｒ Ｓｗａｐ", "Ａｗｔｏｍａｔｉｃａｌｌｙ ａｘｅ ａｎｄ ｍａｃｅ ｓｈｉｅｌｄｅｄ ｐｌａｙｅｒｓ",
+    "Ｓｔｊｎ Ｓｌａｍ", "StunSlam",
     "Donut", "JumpReset", "axespam", "axe spam",
+    
     "findKnockbackSword", "attackRegisteredThisClick",
     "AimAssist", "aimassist", "aim assist",
     "triggerbot", "trigger bot",
@@ -169,11 +180,7 @@ $cheatStrings = @(
     "FakeLag", "pingspoof", "ping spoof",
     "ＦａｋｅＬａｇ", "Ｆａｋｅ Ｌａｇ",
     "fakePunch", "Fake Punch",
-    "Ｆａｋｅ Ｐｗｎｃｈ",
-    "𝐌𝐨𝐝𝐮𝐥𝐞𝐬",
-    "𝐂𝐨𝐧𝐟𝐢𝐠𝐬",
-    "𝐄𝐍𝐀𝐁𝐋𝐄𝐃",
-    "𝐃𝐈𝐒𝐀𝐁𝐋𝐄𝐃",
+    "Ｆａｋｅ Ｐｊｎｃｈ",
     "mace_swap", "quick_strike", "macro_198", "stun_slam",
     "safe_anchor", "double_anchor", "auto_pot_refill",
     "walksy_optimizer", "key_pearl", "aim_assist",
@@ -185,7 +192,7 @@ $cheatStrings = @(
     "REOFFHAND_TOTEM",
     "webmacro", "web macro",
     "AntiWeb", "AutoWeb",
-    "Ａｎｔｉ Ｗｅｂ", "ＡｗｔｏＷｅｂ",
+    "Ａｎｔｉ Ｗｅｂ", "ＡｊｔｏＷｅｂ",
     "Ｐｌａｃｅｓ Ｗｅｂｓ Ｏｎ Ｅｎｅｍｉｅｓ",
     "lvstrng", "dqrkis", "selfdestruct", "self destruct",
     "WalksyCrystalOptimizerMod", "WalksyOptimizer", "WalskyOptimizer",
@@ -196,8 +203,8 @@ $cheatStrings = @(
     "PackSpoof", "Antiknockback", "catlean",
     "AuthBypass", "obfuscatedAuth", "LicenseCheckMixin",
     "BaseFinder", "invsee", "ItemExploit",
-    "FreezePlayer","VirtualMachine",
-    "Ｆｒｅｅｃａｍ", "Ｍｏｖｅ ｆｒｅｅｌｙ ｔｈｒｏｗｇｈ ｗａｌｌｓ",
+    "FreezePlayer",
+    "Ｆｒｅｅｃａｍ", "Ｍｏｖｅ ｆｒｅｅｌｙ ｔｈｒｏｊｇｈ ｗａｌｌｓ",
     "Ｎｏ Ｃｌｉｐ", "Ｆｒｅｅｚｅ Ｐｌａｙｅｒ",
     "LWFH Crystal", "JDWP.VirtualMachine.AllModules",
     "ＬＷＦＨ Ｃｒｙｓｔａｌ",
@@ -207,23 +214,23 @@ $cheatStrings = @(
     "FastPlace",
     "Ｆａｓｔ Ｐｌａｃｅ", "Ｐｌａｃｅ ｂｌｏｃｋｓ ｆａｓｔｅｒ",
     "AutoBreach",
-    "Ａｗｔｏ Ｂｒｅａｃｈ",
+    "Ａｊｔｏ Ｂｒｅａｃｈ",
     "setBlockBreakingCooldown", "getBlockBreakingCooldown", "blockBreakingCooldown",
     "onBlockBreaking", "setItemUseCooldown",
-    "setSelectedSlot", "invokeDoAttack", "invokeDoItemUse", "invokeOnMouseButton",
+    "invokeDoAttack", "invokeDoItemUse", "invokeOnMouseButton",
     "onPushOutOfBlocks", "onIsGlowing",
     "Automatically switches to sword when hitting with totem",
     "arrayOfString", "POT_CHEATS",
     "Dqrkis Client", "Entity.isGlowing",
     "Activate Key", "Ａｃｔｉｖａｔｅ Ｋｅｙ",
-    "Click Simulation", "Ｃｌｉｃｋ Ｓｉｍｕｌａｔｉｏｎ",
+    "Click Simulation", "Ｃｌｉｃｋ Ｓｉｍｊｌａｔｉｏｎ",
     "On RMB", "Ｏｎ ＲＭＢ",
-    "No Count Glitch", "Ｎｏ Ｃｏｗｎｔ Ｇｌｉｔｃｈ",
-    "No Bounce", "NoBounce", "Ｎｏ Ｂｏｗｎｃｅ", "ＮｏＢｏｗｎｃｅ",
-    "Ｒｅｍｏｖｅｓ ｔｈｅ ｃｒｙｓｔａｌ ｂｏｗｎｃｅ ａｎｉｍａｔｉｏｎ",
+    "No Count Glitch", "Ｎｏ Ｃｏｊｎｔ Ｇｌｉｔｃｈ",
+    "No Bounce", "NoBounce", "Ｎｏ Ｂｏｊｎｃｅ", "ＮｏＢｏｊｎｃｅ",
+    "Ｒｅｍｏｖｅｓ ｔｈｅ ｃｒｙｓｔａｌ ｂｏｊｎｃｅ ａｎｉｍａｔｉｏｎ",
     "Place Delay", "Ｐｌａｃｅ Ｄｅｌａｙ",
     "Break Delay", "Ｂｒｅａｋ Ｄｅｌａｙ",
-    "Ｆａｓｔ Ｍｏｄｅ",
+     "Ｆａｓｔ Ｍｏｄｅ",
     "Place Chance", "Ｐｌａｃｅ Ｃｈａｎｃｅ",
     "Break Chance", "Ｂｒｅａｋ Ｃｈａｎｃｅ",
     "Stop On Kill", "Ｓｔｏｐ Ｏｎ Ｋｉｌｌ",
@@ -254,7 +261,7 @@ $cheatStrings = @(
     "Attack Delay", "Ａｔｔａｃｋ Ｄｅｌａｙ",
     "Breach Delay", "Ｂｒｅａｃｈ Ｄｅｌａｙ",
     "Require Elytra", "Ｒｅｑｊｉｒｅ Ｅｌｙｔｒａ",
-    "Auto Switch Back", "Ａｗｔｏ Ｓｗｉｔｃｈ Ｂａｃｋ",
+    "Auto Switch Back", "Ａｊｔｏ Ｓｗｉｔｃｈ Ｂａｃｋ",
     "Check Line of Sight", "Ｃｈｅｃｋ Ｌｉｎｅ ｏｆ Ｓｉｇｈｔ",
     "Only When Falling", "Ｏｎｌｙ Ｗｈｅｎ Ｆａｌｌｉｎｇ",
     "Require Crit", "Ｒｅｑｊｉｒｅ Ｃｒｉｔ",
@@ -263,7 +270,7 @@ $cheatStrings = @(
     "Check Shield", "Ｃｈｅｃｋ Ｓｈｉｅｌｄ",
     "On Pop", "Ｏｎ Ｐｏｐ",
     "Predict Damage", "Ｐｒｅｄｉｃｔ Ｄａｍａｇｅ",
-    "On Ground", "Ｏｎ Ｇｒｏｗｎｄ",
+    "On Ground", "Ｏｎ Ｇｒｏｊｎｄ",
     "Check Players", "Ｃｈｅｃｋ Ｐｌａｙｅｒｓ",
     "Predict Crystals", "Ｐｒｅｄｉｃｔ Ｃｒｙｓｔａｌｓ",
     "Check Aim", "Ｃｈｅｃｋ Ａｉｍ",
@@ -272,7 +279,7 @@ $cheatStrings = @(
     "Blatant", "Ｂｌａｔａｎｔ",
     "Force Totem", "Ｆｏｒｃｅ Ｔｏｔｅｍ",
     "Stay Open For", "Ｓｔａｙ Ｏｐｅｎ Ｆｏｒ",
-    "Auto Inventory Totem", "Ａｗｔｏ Ｉｎｖｅｎｔｏｒｙ Ｔｏｔｅｍ",
+    "Auto Inventory Totem", "Ａｊｔｏ Ｉｎｖｅｎｔｏｒｙ Ｔｏｔｅｍ",
     "Only On Pop", "Ｏｎｌｙ Ｏｎ Ｐｏｐ",
     "Vertical Speed", "Ｖｅｒｔｉｃａｌ Ｓｐｅｅｄ",
     "Hover Totem", "Ｈｏｖｅｒ Ｔｏｔｅｍ",
@@ -301,11 +308,11 @@ $cheatStrings = @(
     "ｓｔｏｐＯｎＫｉｌｌ", "ａｃｔｉｖａｔｅＯｎＲｉｇｈｔＣｌｉｃｋ",
     "ｄａｍａｇｅｔｉｃｋ", "ｈｏｌｄＣｒｙｓｔａｌ",
     "ｆａｋｅＰｊｎｃｈ",
-    "Ｒｅｆｉｌｌｓ ｙｏｗｒ ｈｏｔｂａｒ ｗｉｔｈ ｐｏｔｉｏｎｓ",
-    "Ｋｅｐｓ ｙｏｗｒ ｓｐｒｉｎｔｉｎｇ ａｔ ａｌｌ ｔｉｍｅｓ",
-    "Ｐｌａｃｅｓ ａｎｃｈｏｒ， ｃｈａｒｇｅｓ ｉｔ， ｐｒｏｔｅｃｔｓ ｙｏｗｒ， ａｎｄ ｅｘｐｌｏｄｅｓ",
-    "Ａｗｔｏ ｓｗａｐ ｔｏ ｓｐｅａｒ ｏｎ ａｔｔａｃｋ",
-    "Macro Key", "Ａｗｔｏ Ｐｏｔ", "Ｍａｃｒｏ Ｋｅｙ",
+    "Ｒｅｆｉｌｌｓ ｙｏｊｒ ｈｏｔｂａｒ ｗｉｔｈ ｐｏｔｉｏｎｓ",
+    "Ｋｅｐｓ ｙｏｊｒ ｓｐｒｉｎｔｉｎｇ ａｔ ａｌｌ ｔｉｍｅｓ",
+    "Ｐｌａｃｅｓ ａｎｃｈｏｒ， ｃｈａｒｇｅｓ ｉｔ， ｐｒｏｔｅｃｔｓ ｙｏｊｒ， ａｎｄ ｅｘｐｌｏｄｅｓ",
+    "Ａｊｔｏ ｓｗａｐ ｔｏ ｓｐｅａｒ ｏｎ ａｔｔａｃｋ",
+    "Macro Key", "Ａｊｔｏ Ｐｏｔ", "Ｍａｃｒｏ Ｋｅｙ",
     "KillAura", "ClickAura", "MultiAura", "ForceField", "LegitAura",
     "AimBot", "AutoAim", "SilentAim", "AimLock", "HeadSnap",
     "CrystalAura",
@@ -339,10 +346,10 @@ $cheatStrings = @(
     "DoubleClicker", "JitterClick", "ButterflyClick", "CPSBoost",
     "ChestStealer", "InvManager", "InvMovebypass",
     "AutoSprint", "AntiAFK", "AutoRespawn",
-    "FakeNick", "PopSwitch",
+    "PopSwitch",
     "FakeLatency", "FakePing", "SpoofRotation", "PositionSpoof",
     "GameSpeed", "SpeedTimer",
-    "GrimBypass", "VulcanBypass", "MatrixBypass",
+     "GrimBypass", "VulcanBypass", "MatrixBypass",
     "AACBypass", "VerusDisabler", "IntaveBypass", "WatchdogBypass",
     "PacketMine", "PacketWalk", "PacketSneak", "PacketCancel", "PacketDupe", "PacketSpam",
     "SelfDestruct", "HideClient",
@@ -371,33 +378,22 @@ $cheatStrings = @(
     "pandaware", "skilled", "moonClient", "astolfo",
     "futureClient", "konas", "rusherhack", "inertia", "exhibition",
     "dev.krypton", "dev/krypton", "skid.krypton", "skid/krypton",
-    "VirginClient", "virgin client",
+     "VirginClient", "virgin client",
     "catlean", "CatleanClient", "catlean client",
-    "ArgonClient", "argon client",
+     "ArgonClient", "argon client",
     "Asteria", "AsteriaClient", "asteria client",
     "Prestige", "PrestigeClient", "prestige client", "prestigeclient.vip",
     "gypsy", "GypsyClient", "gypsy client",
     "Xenon", "XenonClient", "xenon client",
-    "GrimClient", "grim client",
+     "GrimClient", "grim client",
     "phantom-refmap.json",
-    "dqrkis.xyz", "Dqrkis Client",
-
-    "activateKey", "checkPlace", "switchDelay", "switchChance",
-    "placeDelay", "placeChance", "workWithTotem", "workWithCrystal",
-    "clickSimulation", "swordSwapplayersOnly", "requireClick",
-    "visibilityCheck", "targetLock", "switchTargetKey",
-    "minSpeed", "maxSpeed", "randomize", "targetBone", "weaponOnly",
-    "lockedTarget", "switchKeyWasPressed", "lastFrame", "smoothTargetPos",
-    "S.afe hor", "Action Speed", "Switch Wait Time", "Totem Sl",
-    "Rotation Sp", "Use Easing", "Easing S", "chestplate"
+     "dqrkis.xyz", "Dqrkis Client"
 )
 
-$suspiciousPatterns = @($suspiciousPatterns | Select-Object -Unique)
-$cheatStrings       = @($cheatStrings       | Select-Object -Unique)
-
-$fullwidthRegex = [regex]::new("[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}", [System.Text.RegularExpressions.RegexOptions]::Compiled)
-$escapedPatterns = $suspiciousPatterns | ForEach-Object { [regex]::Escape($_) }
-$patternRegex = [regex]::new('(?<![A-Za-z])(' + ($escapedPatterns -join '|') + ')(?![A-Za-z])', [System.Text.RegularExpressions.RegexOptions]::Compiled)
+$patternRegex = [regex]::new(
+    '(?<![A-Za-z])(' + ($suspiciousPatterns -join '|') + ')(?![A-Za-z])',
+    [System.Text.RegularExpressions.RegexOptions]::Compiled
+)
 
 $cheatStringSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
 foreach ($s in $cheatStrings) { [void]$cheatStringSet.Add($s) }
@@ -454,29 +450,38 @@ function Query-Megabase {
     return $null
 }
 
-# --- CORE SCAN FUNCTIONS (enhanced with Meow scan logic) ---
+$fullwidthRegex = [regex]::new(
+    "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}",
+    [System.Text.RegularExpressions.RegexOptions]::Compiled
+)
 
 function Invoke-ModScan {
-    param([string]$FilePath, [switch]$DeepScan)
+    param([string]$FilePath)
+
     $foundPatterns  = [System.Collections.Generic.HashSet[string]]::new()
     $foundStrings   = [System.Collections.Generic.HashSet[string]]::new()
     $foundFullwidth = [System.Collections.Generic.HashSet[string]]::new()
-    $archive = $null
-    $innerArchives = [System.Collections.Generic.List[object]]::new()
+
     try {
         $archive = [System.IO.Compression.ZipFile]::OpenRead($FilePath)
-        $allEntries = [System.Collections.Generic.List[object]]::new()
 
         foreach ($entry in $archive.Entries) {
-            if ($global:stopScan) { return @{ Patterns = $foundPatterns; Strings = $foundStrings; Fullwidth = $foundFullwidth } }
-            foreach ($m in $patternRegex.Matches($entry.FullName)) { [void]$foundPatterns.Add($m.Value) }
-            $allEntries.Add($entry)
+            foreach ($m in $patternRegex.Matches($entry.FullName)) {
+                [void]$foundPatterns.Add($m.Value)
+            }
         }
+
+        $allEntries    = [System.Collections.Generic.List[object]]::new()
+        $innerArchives = [System.Collections.Generic.List[object]]::new()
+
+        foreach ($e in $archive.Entries) { $allEntries.Add($e) }
 
         foreach ($nj in ($archive.Entries | Where-Object { $_.FullName -match "^META-INF/jars/.+\.jar$" })) {
             try {
-                $ns = $nj.Open(); $ms = New-Object System.IO.MemoryStream
-                $ns.CopyTo($ms); $ns.Close(); $ms.Position = 0
+                $ns = $nj.Open()
+                $ms = New-Object System.IO.MemoryStream
+                $ns.CopyTo($ms); $ns.Close()
+                $ms.Position = 0
                 $iz = [System.IO.Compression.ZipArchive]::new($ms, [System.IO.Compression.ZipArchiveMode]::Read)
                 $innerArchives.Add($iz)
                 foreach ($ie in $iz.Entries) { $allEntries.Add($ie) }
@@ -484,67 +489,64 @@ function Invoke-ModScan {
         }
 
         foreach ($entry in $allEntries) {
-            if ($global:stopScan) { return @{ Patterns = $foundPatterns; Strings = $foundStrings; Fullwidth = $foundFullwidth } }
             $name = $entry.FullName
 
-            $shouldRead = ($name -match 'MANIFEST\.MF') -or ($DeepScan -and $name -match '\.(class|json)$')
-            if ($shouldRead) {
+            if ($name -match '\.(class|json)$' -or $name -match 'MANIFEST\.MF') {
                 try {
-                    $st = $entry.Open(); $ms2 = New-Object System.IO.MemoryStream
+                    $st = $entry.Open()
+                    $ms2 = New-Object System.IO.MemoryStream
                     $st.CopyTo($ms2); $st.Close()
                     $bytes = $ms2.ToArray(); $ms2.Dispose()
+
                     $ascii = [System.Text.Encoding]::ASCII.GetString($bytes)
                     $utf8  = [System.Text.Encoding]::UTF8.GetString($bytes)
+
                     foreach ($m in $patternRegex.Matches($ascii)) { [void]$foundPatterns.Add($m.Value) }
+
                     foreach ($s in $cheatStringSet) {
-                        if ($ascii.Contains($s, [System.StringComparison]::Ordinal)) { [void]$foundStrings.Add($s); continue }
-                        if ($utf8.Contains($s, [System.StringComparison]::Ordinal))  { [void]$foundStrings.Add($s) }
+                        if ($ascii.Contains($s)) { [void]$foundStrings.Add($s); continue }
+                        if ($utf8.Contains($s))  { [void]$foundStrings.Add($s) }
                     }
-                    foreach ($m in $fullwidthRegex.Matches($utf8)) { [void]$foundFullwidth.Add($m.Value) }
-                } catch { }
-            }
 
-            if ($DeepScan -and $name -match '\.(class|json)$') {
-                try {
-                    $st = $entry.Open(); $ms2 = New-Object System.IO.MemoryStream
-                    $st.CopyTo($ms2); $st.Close()
-                    $bytes = $ms2.ToArray(); $ms2.Dispose()
-
-                    $contentTypes = @(
-                        @{ Encoding = [System.Text.Encoding]::ASCII; Set = $foundPatterns; Func = { param($c,$p) foreach ($m in $patternRegex.Matches($c)) { [void]$p.Add($m.Value) } }},
-                        @{ Encoding = [System.Text.Encoding]::ASCII; Set = $foundStrings; Func = { param($c,$p) foreach ($s in $cheatStringSet) { if ($c.Contains($s, [System.StringComparison]::Ordinal)) { [void]$p.Add($s) } }}},
-                        @{ Encoding = [System.Text.Encoding]::UTF8; Set = $foundStrings; Func = { param($c,$p) foreach ($s in $cheatStringSet) { if ($c.Contains($s, [System.StringComparison]::Ordinal)) { [void]$p.Add($s) } }}},
-                        @{ Encoding = [System.Text.Encoding]::UTF8; Set = $foundFullwidth; Func = { param($c,$p) foreach ($m in $fullwidthRegex.Matches($c)) { [void]$p.Add($m.Value) }}}
-                    )
+                    foreach ($m in $fullwidthRegex.Matches($utf8)) {
+                        [void]$foundFullwidth.Add($m.Value)
+                    }
                 } catch { }
             }
         }
-    } catch {
-        [void]$foundStrings.Add("[scan error: $($_.Exception.Message)]")
-    } finally {
-        foreach ($ia in $innerArchives) { try { $ia.Dispose() } catch { } }
-        if ($archive) { try { $archive.Dispose() } catch { } }
-    }
 
-    $fwCheatPool = @($cheatStrings | Where-Object { $_ -cmatch "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]" })
+        foreach ($ia in $innerArchives) { try { $ia.Dispose() } catch { } }
+        $archive.Dispose()
+    } catch { }
+
+    $fwCheatPool = @($script:cheatStrings | Where-Object {
+        $_ -cmatch "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]"
+    })
     $resolvedFullwidth = [System.Collections.Generic.HashSet[string]]::new()
     foreach ($fw in @($foundFullwidth)) {
         if ($fw.Length -lt 3) { continue }
         $bestMatch = $null
         foreach ($cs in $fwCheatPool) {
             if ($cs.Contains($fw)) {
-                if ($null -eq $bestMatch -or $cs.Length -lt $bestMatch.Length) { $bestMatch = $cs }
+                if ($null -eq $bestMatch -or $cs.Length -lt $bestMatch.Length) {
+                    $bestMatch = $cs
+                }
             }
         }
-        if ($null -ne $bestMatch) { [void]$resolvedFullwidth.Add($bestMatch) }
-        elseif ($fw.Length -ge 6) { [void]$resolvedFullwidth.Add($fw) }
+        if ($null -ne $bestMatch) {
+            [void]$resolvedFullwidth.Add($bestMatch)
+        } elseif ($fw.Length -ge 6) {
+            [void]$resolvedFullwidth.Add($fw)
+        }
     }
     $resolved = @($resolvedFullwidth)
     $finalFullwidth = [System.Collections.Generic.HashSet[string]]::new()
     foreach ($fw in $resolved) {
         $isRedundant = $false
         foreach ($other in $resolved) {
-            if ($fw.Length -lt $other.Length -and $other.Contains($fw)) { $isRedundant = $true; break }
+            if ($fw.Length -lt $other.Length -and $other.Contains($fw)) {
+                $isRedundant = $true; break
+            }
         }
         if (-not $isRedundant) { [void]$finalFullwidth.Add($fw) }
     }
@@ -553,129 +555,136 @@ function Invoke-ModScan {
 }
 
 function Invoke-ObfuscationScan {
-    param([string]$FilePath, [switch]$DeepScan)
+    param([string]$FilePath)
+
     $flags = [System.Collections.Generic.List[string]]::new()
-    $archive = $null
+
     try {
         $archive = [System.IO.Compression.ZipFile]::OpenRead($FilePath)
-        $totalClass=0; $numericCount=0; $unicodeCount=0; $fullwidthCount=0; $japaneseCount=0
-        $singleLetterCount=0; $twoLetterCount=0; $gibberishCount=0; $noVowelCount=0
-        $confusionCount=0; $singleCharPkg=0
-        $contentSample = [System.Text.StringBuilder]::new(); $sampleSize = 0
+
+        $totalClass    = 0
+        $numericCount  = 0
+        $unicodeCount  = 0
+        $fullwidthCount= 0
+        $japaneseCount = 0
+        $singleLetterCount = 0
+        $twoLetterCount    = 0
+        $gibberishCount    = 0
+        $noVowelCount      = 0
+        $confusionCount    = 0
+        $singleCharPkg     = 0
+        $contentSample     = [System.Text.StringBuilder]::new()
+        $sampleSize        = 0
+
         $cheatObfuscators = @{
-            "Skidfuscator"   = @("dev/skidfuscator","Skidfuscator","skidfuscator.dev")
-            "Paramorphism"   = @("Paramorphism","paramorphism-","dev/paramorphism")
-            "Radon"          = @("ItzSomebody/Radon","me/itzsomebody/radon","Radon Obfuscator")
-            "Caesium"        = @("sim0n/Caesium","Caesium Obfuscator","dev/sim0n/caesium")
-            "Bozar"          = @("vimasig/Bozar","Bozar Obfuscator","com/bozar")
-            "Branchlock"     = @("Branchlock","branchlock.dev")
-            "Binscure"       = @("Binscure","com/binscure")
-            "SuperBlaubeere" = @("superblaubeere","superblaubeere27")
-            "Qprotect"       = @("Qprotect","QProtect","mdma.dev/qprotect")
-            "Zelix"          = @("ZKMFLOW","ZKM","ZelixKlassMaster","com/zelix")
-            "Stringer"       = @("StringerJavaObfuscator","com/licel/stringer")
-            "JNIC"           = @("JNIC","jnic.obf","jnic-obfuscator")
-            "Scuti"          = @("ScutiObf","scuti.obf")
-            "Smoke"          = @("SmokeObf","smoke.obf")
-            "Allatori"       = @("Allatori","allatori","com/allatori","allatori.obf")
-            "DashO"          = @("DashO","dasho","com/dasho","preEmptive.DashO")
-            "MinecraftSelfObf"= @("selfObf","selfobf","minecraft/Obfuscation","magic/Obfuscator")
-            "NameObfuscation" = @("NameObfuscation","nameObfuscator","renameObf")
-            "XenForgeObf"    = @("xenforgewrapper","XenForge","xenforge.obf")
-            "SandboxObf"     = @("sandbox_obf","SandboxObfuscator")
-            "Morphii"        = @("morphii","MorphiiObf","morph.obf")
-            "JavaCrack"      = @("javamc.obf","MCrack","mcObfuscator")
+            "Skidfuscator"   = @("dev/skidfuscator", "Skidfuscator", "skidfuscator.dev")
+            "Paramorphism"   = @("Paramorphism", "paramorphism-", "dev/paramorphism")
+            "Radon"          = @("ItzSomebody/Radon", "me/itzsomebody/radon", "Radon Obfuscator")
+            "Caesium"        = @("sim0n/Caesium", "Caesium Obfuscator", "dev/sim0n/caesium")
+            "Bozar"          = @("vimasig/Bozar", "Bozar Obfuscator", "com/bozar")
+            "Branchlock"     = @("Branchlock", "branchlock.dev")
+            "Binscure"       = @("Binscure", "com/binscure")
+            "SuperBlaubeere" = @("superblaubeere", "superblaubeere27")
+            "Qprotect"       = @("Qprotect", "QProtect", "mdma.dev/qprotect")
+            "Zelix"          = @("ZKMFLOW", "ZKM", "ZelixKlassMaster", "com/zelix")
+            "Stringer"       = @("StringerJavaObfuscator", "com/licel/stringer")
+            "JNIC"           = @("JNIC", "jnic.obf", "jnic-obfuscator")
+            "Scuti"          = @("ScutiObf", "scuti.obf")
+            "Smoke"          = @("SmokeObf", "smoke.obf")
         }
 
         foreach ($entry in $archive.Entries) {
-            if ($global:stopScan) { return $flags }
             $name = $entry.FullName
+
             if ($name -match "\.class$") {
                 $totalClass++
                 $className = [System.IO.Path]::GetFileNameWithoutExtension(($name -split "/")[-1])
-                if ($className -match "^\d+$")                                                       { $numericCount++ }
-                if ($className -match "[^\x00-\x7F]")                                                { $unicodeCount++ }
-                if ($className -match "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]")                  { $fullwidthCount++ }
-                if ($className -match "[\u3040-\u309F\u30A0-\u30FF]")                               { $japaneseCount++ }
-                if ($className -match "^[a-zA-Z]$")                                                  { $singleLetterCount++ }
-                if ($className -match "^[a-zA-Z]{2}$")                                               { $twoLetterCount++ }
-                if ($className -match "^[Il1O0]+$" -or $className -match "^[_]+$")                  { $confusionCount++ }
+
+                if ($className -match "^\d+$")                          { $numericCount++ }
+                if ($className -match "[^\x00-\x7F]")                   { $unicodeCount++ }
+                if ($className -match "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]") { $fullwidthCount++ }
+                if ($className -match "[\u3040-\u309F\u30A0-\u30FF]")  { $japaneseCount++ }
+                if ($className -match "^[a-zA-Z]$")                     { $singleLetterCount++ }
+                if ($className -match "^[a-zA-Z]{2}$")                  { $twoLetterCount++ }
+                if ($className -match "^[Il1O0]+$" -or $className -match "^[_]+$") { $confusionCount++ }
+
                 if ($className.Length -ge 3 -and $className.Length -le 8 -and $className -match "^[a-zA-Z]+$") {
                     $vowels = ($className.ToCharArray() | Where-Object { $_ -match "[aeiouAEIOU]" }).Count
                     if ($vowels -eq 0) { $noVowelCount++ }
                     $hasCluster = $className -match "[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]{3,}"
                     if ($hasCluster -and ($vowels / $className.Length) -lt 0.3) { $gibberishCount++ }
                 }
-                $segs = ($name -replace "\.class$","") -split "/"
-                foreach ($seg in $segs[0..($segs.Count-2)]) { if ($seg.Length -eq 1) { $singleCharPkg++ } }
+
+                $segs = ($name -replace "\.class$", "") -split "/"
+                foreach ($seg in $segs[0..($segs.Count - 2)]) {
+                    if ($seg.Length -eq 1) { $singleCharPkg++ }
+                }
+
+                if ($sampleSize -lt 150000 -and $entry.Length -lt 100000 -and $entry.Length -gt 100) {
+                    try {
+                        $st = $entry.Open()
+                        $ms = New-Object System.IO.MemoryStream
+                        $st.CopyTo($ms); $st.Close()
+                        $ascii = [System.Text.Encoding]::ASCII.GetString($ms.ToArray())
+                        $ms.Dispose()
+                        [void]$contentSample.Append($ascii)
+                        $sampleSize += $ascii.Length
+                    } catch { }
+                }
             }
         }
+
+        $archive.Dispose()
 
         if ($totalClass -lt 5) { return $flags }
 
         $pct = { param($n) [math]::Round(($n / $totalClass) * 100) }
-        $numPct  = & $pct $numericCount;  $uniPct  = & $pct $unicodeCount;  $fwPct = & $pct $fullwidthCount
-        $jpPct   = & $pct $japaneseCount; $s1Pct   = & $pct $singleLetterCount; $s2Pct = & $pct $twoLetterCount
-        $gibPct  = & $pct $gibberishCount; $novPct = & $pct $noVowelCount; $confPct = & $pct $confusionCount
-        if ($numPct  -ge 20) { $flags.Add("Numeric class names - $numPct% of classes have numeric-only names") }
-        if ($uniPct  -ge 10) { $flags.Add("Unicode class names - $uniPct% of classes use non-ASCII characters") }
-        if ($fwPct   -gt  0) { $flags.Add("Fullwidth Unicode class names - $fwPct% use fullwidth chars") }
-        if ($jpPct   -gt  0) { $flags.Add("Japanese obfuscation - $jpPct% use hiragana/katakana names") }
-        if ($s1Pct   -ge 15) { $flags.Add("Single-letter class names - $s1Pct%") }
-        if ($s2Pct   -ge 20) { $flags.Add("Two-letter class names - $s2Pct%") }
-        if ($gibPct  -ge 5) { $flags.Add("Gibberish class names - $gibPct% have no vowels/consonant clusters") }
-        if ($novPct  -ge 8) { $flags.Add("No-vowel class names - $novPct%") }
-        if ($confPct -ge 3) { $flags.Add("Confusion-char names (Il1O0/_) - $confPct%") }
-        if ($singleCharPkg -ge 6) { $flags.Add("Single-char package paths - $singleCharPkg path segments like a/b/c") }
 
-        if ($DeepScan) {
-            foreach ($entry in $archive.Entries) {
-                if ($global:stopScan) { return $flags }
-                $name = $entry.FullName
-                if ($name -match "\.class$" -and $sampleSize -lt 150000 -and $entry.Length -lt 100000 -and $entry.Length -gt 100) {
-                    try {
-                        $st = $entry.Open(); $ms = New-Object System.IO.MemoryStream
-                        $st.CopyTo($ms); $st.Close()
-                        $ascii = [System.Text.Encoding]::ASCII.GetString($ms.ToArray()); $ms.Dispose()
-                        [void]$contentSample.Append($ascii); $sampleSize += $ascii.Length
-                    } catch { }
-                }
-            }
+        $numPct   = & $pct $numericCount
+        $uniPct   = & $pct $unicodeCount
+        $fwPct    = & $pct $fullwidthCount
+        $jpPct    = & $pct $japaneseCount
+        $s1Pct    = & $pct $singleLetterCount
+        $s2Pct    = & $pct $twoLetterCount
+        $gibPct   = & $pct $gibberishCount
+        $novPct   = & $pct $noVowelCount
+        $confPct  = & $pct $confusionCount
 
-            $sampleStr = $contentSample.ToString()
-            $fwStringMatches = [regex]::Matches($sampleStr, "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}")
-            if ($fwStringMatches.Count -gt 0) {
-                $flags.Add("Fullwidth strings in class content - $($fwStringMatches.Count) occurrences")
-            }
+        if ($numPct   -ge 20) { $flags.Add("Numeric class names — $numPct% of classes have numeric-only names") }
+        if ($uniPct   -ge 10) { $flags.Add("Unicode class names — $uniPct% of classes use non-ASCII characters") }
+        if ($fwPct    -gt  0) { $flags.Add("Fullwidth Unicode class names — $fwPct% use ａｂｃ/ＡＢＣ/０１２ chars ($fullwidthCount classes)") }
+        if ($jpPct    -gt  0) { $flags.Add("Japanese obfuscation — $jpPct% use hiragana/katakana class names ($japaneseCount classes)") }
+        if ($s1Pct    -ge 15) { $flags.Add("Single-letter class names — $s1Pct% ($singleLetterCount classes)") }
+        if ($s2Pct    -ge 20) { $flags.Add("Two-letter class names — $s2Pct% ($twoLetterCount classes)") }
+        if ($gibPct   -ge  5) { $flags.Add("Gibberish class names — $gibPct% have no vowels / consonant clusters ($gibberishCount classes)") }
+        if ($novPct   -ge  8) { $flags.Add("No-vowel class names — $novPct% ($noVowelCount classes)") }
+        if ($confPct  -ge  3) { $flags.Add("Confusion-char names (Il1O0/_) — $confPct% ($confusionCount classes)") }
+        if ($singleCharPkg -ge 6) { $flags.Add("Single-char package paths — $singleCharPkg path segments like a/b/c") }
 
-            foreach ($obfName in $cheatObfuscators.Keys) {
-                foreach ($pat in $cheatObfuscators[$obfName]) {
-                    if ($sampleStr.Contains($pat)) { $flags.Add("Known cheat obfuscator detected - $obfName (matched: $pat)"); break }
-                }
-            }
-
-            $obfStringPatterns = @(
-                @{Pattern='(?i)(?:string|str)_(?:obf|enc|crypt|hide|mangle)'; Label='String obfuscation methods'},
-                @{Pattern='(?i)decrypt(?:String|Str|Key|Payload)'; Label='Decryption methods present'},
-                @{Pattern='(?i)\.(?:obfuscate|deobfuscate|remap|rename)\(?\)'; Label='Obfuscation API calls'},
-                @{Pattern='(?i)(?:class|method|field)_(?:mapping|remap|rename|transform)'; Label='Runtime mapping/remap methods'}
-            )
-            foreach ($obfPat in $obfStringPatterns) {
-                if ($sampleStr -match $obfPat.Pattern) { $flags.Add("$($obfPat.Label) - matched: $($matches[0])") }
-            }
-
-            $reflectCount = [regex]::Matches($sampleStr, '(?i)(?:getDeclaredMethod|getDeclaredField|setAccessible|invoke\s*\(|forName\s*\()').Count
-            if ($reflectCount -ge 50) { $flags.Add("Heavy reflection usage - $reflectCount reflection calls") }
+        $fwStringMatches = [regex]::Matches($contentSample.ToString(), "[\uFF21-\uFF3A\uFF41-\uFF5A\uFF10-\uFF19]{2,}")
+        if ($fwStringMatches.Count -gt 0) {
+            $examples = ($fwStringMatches | Select-Object -First 3 | ForEach-Object { $_.Value }) -join ", "
+            $flags.Add("Fullwidth strings in class content — $($fwStringMatches.Count) occurrences (e.g. $examples)")
         }
 
-    } catch { } finally {
-        if ($archive) { try { $archive.Dispose() } catch { } }
-    }
+        $sampleStr = $contentSample.ToString()
+        foreach ($obfName in $cheatObfuscators.Keys) {
+            foreach ($pat in $cheatObfuscators[$obfName]) {
+                if ($sampleStr.Contains($pat)) {
+                    $flags.Add("Known cheat obfuscator detected — $obfName (matched: $pat)")
+                    break
+                }
+            }
+        }
+
+    } catch { }
+
     return $flags
 }
 
 function Invoke-BypassScan {
-    param([string]$FilePath, [switch]$DeepScan)
+    param([string]$FilePath)
+
     $flags = [System.Collections.Generic.List[string]]::new()
 
     $mavenPrefixes = @(
@@ -708,12 +717,12 @@ function Invoke-BypassScan {
             }
         }
         foreach ($sj in $suspiciousNestedJars) {
-            $flags.Add("Suspicious nested JAR - no version, unknown dependency: $sj")
+            $flags.Add("Suspicious nested JAR — no version, unknown dependency: $sj")
         }
 
         if ($nestedJars.Count -eq 1 -and $outerClasses.Count -lt 3) {
             $njName = [System.IO.Path]::GetFileName(($nestedJars | Select-Object -First 1).FullName)
-            $flags.Add("Hollow shell - only $($outerClasses.Count) own class(es), wraps: $njName")
+            $flags.Add("Hollow shell — only $($outerClasses.Count) own class(es), wraps: $njName")
         }
 
         $outerModId = ""
@@ -752,7 +761,6 @@ function Invoke-BypassScan {
         $totalClassCount   = 0
 
         foreach ($entry in $allEntries) {
-            if ($global:stopScan) { break }
             $name = $entry.FullName
 
             if ($name -match "\.class$") {
@@ -775,25 +783,35 @@ function Invoke-BypassScan {
                 }
                 if ($maxConsecutive -ge 3) { $obfuscatedCount++ }
 
-                if ($DeepScan) {
-                    try {
-                        $st = $entry.Open()
-                        $ms2 = New-Object System.IO.MemoryStream
-                        $st.CopyTo($ms2); $st.Close()
-                        $rawBytes = $ms2.ToArray(); $ms2.Dispose()
-                        $ct = [System.Text.Encoding]::ASCII.GetString($rawBytes)
+                try {
+                    $st = $entry.Open()
+                    $ms2 = New-Object System.IO.MemoryStream
+                    $st.CopyTo($ms2)
+                    $st.Close()
+                    $rawBytes = $ms2.ToArray()
+                    $ms2.Dispose()
+                    $ct = [System.Text.Encoding]::ASCII.GetString($rawBytes)
 
-                        if ($ct -match "java/lang/Runtime" -and $ct -match "getRuntime" -and $ct -match "exec") {
-                            $runtimeExecFound = $true
-                        }
-                        if ($ct -match "openConnection" -and $ct -match "HttpURLConnection" -and $ct -match "FileOutputStream") {
-                            $httpDownloadFound = $true
-                        }
-                        if ($ct -match "openConnection" -and $ct -match "setDoOutput" -and $ct -match "getOutputStream" -and $ct -match "getProperty") {
-                            $httpExfilFound = $true
-                        }
-                    } catch { }
-                }
+                    if ($ct -match "java/lang/Runtime" -and
+                        $ct -match "getRuntime" -and
+                        $ct -match "exec") {
+                        $runtimeExecFound = $true
+                    }
+
+                    if ($ct -match "openConnection" -and
+                        $ct -match "HttpURLConnection" -and
+                        $ct -match "FileOutputStream") {
+                        $httpDownloadFound = $true
+                    }
+
+                    if ($ct -match "openConnection" -and
+                        $ct -match "setDoOutput" -and
+                        $ct -match "getOutputStream" -and
+                        $ct -match "getProperty") {
+                        $httpExfilFound = $true
+                    }
+
+                } catch { }
             }
         }
 
@@ -805,22 +823,22 @@ function Invoke-BypassScan {
         $uniPct = if ($totalClassCount -ge 5)  { [math]::Round(($unicodeClassCount / $totalClassCount) * 100) } else { 0 }
 
         if ($runtimeExecFound -and $obfPct -ge 25) {
-            $flags.Add("Runtime.exec() in obfuscated code - can run arbitrary OS commands")
+            $flags.Add("Runtime.exec() in obfuscated code — can run arbitrary OS commands")
         }
         if ($httpDownloadFound) {
-            $flags.Add("HTTP file download - fetches and writes files from a remote server at runtime")
+            $flags.Add("HTTP file download — fetches and writes files from a remote server at runtime")
         }
         if ($httpExfilFound) {
-            $flags.Add("HTTP POST exfiltration - sends system data to an external server")
+            $flags.Add("HTTP POST exfiltration — sends system data to an external server")
         }
         if ($totalClassCount -ge 10 -and $obfPct -ge 25) {
-            $flags.Add("Heavy obfuscation - $obfPct% of classes use single-letter path segments (a/b/c style)")
+            $flags.Add("Heavy obfuscation — $obfPct% of classes use single-letter path segments (a/b/c style)")
         }
         if ($numPct -ge 20) {
-            $flags.Add("Numeric class names - $numPct% of classes have numeric-only names (e.g. 1234.class)")
+            $flags.Add("Numeric class names — $numPct% of classes have numeric-only names (e.g. 1234.class)")
         }
         if ($uniPct -ge 10) {
-            $flags.Add("Unicode class names - $uniPct% of classes use non-ASCII characters")
+            $flags.Add("Unicode class names — $uniPct% of classes use non-ASCII characters")
         }
 
         $knownLegitModIds = @(
@@ -833,7 +851,7 @@ function Invoke-BypassScan {
             $_ -match "Runtime\.exec|HTTP file download|HTTP POST|Heavy obfuscation|Suspicious nested JAR"
         }).Count
         if ($outerModId -and ($knownLegitModIds -contains $outerModId) -and $dangerCount -gt 0) {
-            $flags.Add("Fake mod identity - claims to be '$outerModId' but contains dangerous code")
+            $flags.Add("Fake mod identity — claims to be '$outerModId' but contains dangerous code")
         }
 
     } catch { }
@@ -844,96 +862,17 @@ function Invoke-BypassScan {
 function Invoke-JvmScan {
     $results = [System.Collections.Generic.List[string]]::new()
 
-    $javaProcesses = Get-Process -Name javaw -ErrorAction SilentlyContinue
-    if ($javaProcesses.Count -eq 0) { $javaProcesses = Get-Process -Name java -ErrorAction SilentlyContinue }
-    if ($javaProcesses.Count -eq 0) {
-        Append-Log "  [i] No javaw.exe/java.exe processes found (Minecraft not running)" "#AAAAAA"
-        return $results
-    }
+    $javaProc = Get-Process javaw -ErrorAction SilentlyContinue
+    if (-not $javaProc) { $javaProc = Get-Process java -ErrorAction SilentlyContinue }
+    if (-not $javaProc) { return $results }
 
-    Append-Log "  [i] Scanning $($javaProcesses.Count) Java process(es)..." "#00FFFF"
+    $javaPid = ($javaProc | Select-Object -First 1).Id
 
-    $fabricPatterns = @{
-        "fabric.addMods"='-Dfabric\.addMods=';
-        "fabric.loadMods"='-Dfabric\.loadMods=';
-        "fabric.classPathGroups"='-Dfabric\.classPathGroups=';
-        "fabric.gameJarPath"='-Dfabric\.gameJarPath=';
-        "fabric.skipMcProvider"='-Dfabric\.skipMcProvider=';
-        "fabric.development"='-Dfabric\.development=';
-        "fabric.allowUnsupportedVersion"='-Dfabric\.allowUnsupportedVersion=';
-        "fabric.remapClasspathFile"='-Dfabric\.remapClasspathFile=';
-        "fabric.skipIntermediary"='-Dfabric\.skipIntermediary=';
-        "fabric.configDir"='-Dfabric\.configDir=';
-        "fabric.loader.config"='-Dfabric\.loader\.config=';
-        "fabric.log.level"='-Dfabric\.log\.level=';
-        "fabric.debug.dumpClasspath"='-Dfabric\.debug\.dumpClasspath=';
-        "fabric.log.config"='-Dfabric\.log\.config=';
-        "fabric.dli.config"='-Dfabric\.dli\.config=';
-        "fabric.mixin.configs"='-Dfabric\.mixin\.configs=';
-        "fabric.mixin.hotSwap"='-Dfabric\.mixin\.hotSwap=';
-        "fabric.mixin.debug.export"='-Dfabric\.mixin\.debug\.export=';
-        "fabric.mixin.debug.verbose"='-Dfabric\.mixin\.debug\.verbose=';
-        "fabric.gameVersion"='-Dfabric\.gameVersion=';
-        "fabric.forceVersion"='-Dfabric\.forceVersion=';
-        "fabric.autoDetectVersion"='-Dfabric\.autoDetectVersion=';
-        "fabric.launcher.name"='-Dfabric\.launcher\.name=';
-        "fabric.launcher.brand"='-Dfabric\.launcher\.brand=';
-        "fabric.mods.toml.path"='-Dfabric\.mods\.toml\.path=';
-        "fabric.customModList"='-Dfabric\.customModList=';
-        "fabric.resolve.modFiles"='-Dfabric\.resolve\.modFiles=';
-        "fabric.skipDependencyResolution"='-Dfabric\.skipDependencyResolution=';
-        "fabric.loader.entrypoints"='-Dfabric\.loader\.entrypoints=';
-        "fabric.language.providers"='-Dfabric\.language\.providers=';
-        "forge.addMods"='-Dforge\.addMods=';
-        "forge.mods"='-Dforge\.mods=';
-        "fml.coreMods.load"='-Dfml\.coreMods\.load=';
-        "forge.coreMods.dir"='-Dforge\.coreMods\.dir=';
-        "forge.modDir"='-Dforge\.modDir=';
-        "forge.modsDirectories"='-Dforge\.modsDirectories=';
-        "fml.customModList"='-Dfml\.customModList=';
-        "forge.disableModScan"='-Dforge\.disableModScan=';
-        "forge.modList"='-Dforge\.modList=';
-        "forge.forceVersion"='-Dforge\.forceVersion=';
-        "forge.disableUpdateCheck"='-Dforge\.disableUpdateCheck=';
-        "forge.logging.mojang.level"='-Dforge\.logging\.mojang\.level=';
-        "forge.mixin.hotSwap"='-Dforge\.mixin\.hotSwap=';
-        "forge.resourcePack"='-Dforge\.resourcePack=';
-        "forge.defaultResourcePack"='-Dforge\.defaultResourcePack=';
-        "forge.texturePacks"='-Dforge\.texturePacks=';
-        "forge.assetIndex"='-Dforge\.assetIndex=';
-        "forge.assetsDir"='-Dforge\.assetsDir=';
-        "javaSecurityManager"='-Djava\.security\.manager=';
-        "javaSecurityPolicy"='-Djava\.security\.policy=';
-        "bootClasspath"='-Xbootclasspath';
-        "systemClassLoader"='-Djava\.system\.class\.loader=';
-        "javaClassPath"='-Djava\.class\.path=';
-        "cp"='-cp\s+["''][^"'';]*\.jar';
-        "cheatClientBrand"='-D(client|launcher)\.brand=(Wurst|Aristois|Impact|Kilo|Future|Lambda|Rusher|Konas|Phobos|Salhack|ForgeHax|Mathax|Meteor|Async|Seppuku|Xatz|Wolfram|Huzuni|Jigsaw|Zamorozka|Moon|Rage|Exhibition|Virtue|Novoline|Rekt|Skid|Ares|Abyss|Thunder|Tenacity|Rise|Flux|Gamesense|Intent|Remix|Sight|Vape|Shield|Ghost|Crispy|Inertia)';
-        "optifine"='-Doptifine\.';
-        "shadersmod"='-Dshaders?\.';
-        "shaderPack"='-Dshader[sP]ack=';
-        "cheatPattern"='-D(xray|fly|speed|killaura|reach|esp|wallhack|noclip|autoclick|aimbot|triggerbot|antiknockback|nofall|timer|step|fullbright|nightvision|cavefinder)\.'
-    }
-    $cheatClients = @('Wurst','Aristois','Impact','Kilo','Future','Lambda','Rusher','Konas','Phobos','Salhack','ForgeHax','Mathax','Meteor','Async','Seppuku','Xatz','Wolfram','Huzuni','Jigsaw','Zamorozka','Moon','Rage','Exhibition','Virtue','Novoline','Rekt','Skid','Ares','Abyss','Thunder','Tenacity','Rise','Flux','Gamesense','Intent','Remix','Sight','Vape','Shield','Ghost','Crispy','Inertia')
+    try {
+        $wmi     = Get-WmiObject Win32_Process -Filter "ProcessId = $javaPid" -ErrorAction Stop
+        $cmdLine = $wmi.CommandLine
 
-    foreach ($proc in $javaProcesses) {
-        if ($global:stopScan) { return $results }
-        try {
-            $pid = $proc.Id
-            $cmdLine = (Get-CimInstance Win32_Process -Filter "ProcessId = $pid" -ErrorAction Stop).CommandLine
-            if (-not $cmdLine) { continue }
-            Append-Log "  +- Process: PID $pid" "#81C784"
-
-            $detectedPatterns = @()
-            foreach ($k in $fabricPatterns.Keys) {
-                if ($cmdLine -match $fabricPatterns[$k]) { $detectedPatterns += $k }
-            }
-            foreach ($cc in $cheatClients) {
-                if ($cmdLine -match "(?i)\b$cc\b" -and $detectedPatterns -notcontains "CheatClient-$cc") { $detectedPatterns += "CheatClient-$cc" }
-            }
-            if ($cmdLine -match '(%3B|%26%26|%7C%7C|%7C|%60|%24|%3C|%3E)') { $detectedPatterns += "EncodedInjection" }
-
-            # From Meow: javaagent detection and suspicious JVM flags
+        if ($cmdLine) {
             $agentMatches = [regex]::Matches($cmdLine, '-javaagent:([^\s"]+)')
             foreach ($m in $agentMatches) {
                 $agentPath = $m.Groups[1].Value.Trim('"').Trim("'")
@@ -942,267 +881,436 @@ function Invoke-JvmScan {
                 $isLegit = $false
                 foreach ($la in $legitAgents) { if ($agentName -match $la) { $isLegit = $true; break } }
                 if (-not $isLegit) {
-                    $detectedPatterns += "JvmAgent-$agentName"
-                    $results.Add("JVM Agent detected - -javaagent:$agentName (path: $agentPath)")
+                    $results.Add("JVM Agent — -javaagent:$agentName (path: $agentPath)")
                 }
             }
 
             $suspiciousFlags = @(
-                "Xbootclasspath/p:","Xbootclasspath/a:","agentlib:jdwp","agentpath:"
+                @{ Flag = "-Xbootclasspath/p:"; Desc = "prepends to bootstrap classpath, overrides core Java classes" },
+                @{ Flag = "-Xbootclasspath/a:"; Desc = "appends to bootstrap classpath, injects below classloader" },
+                @{ Flag = "-agentlib:jdwp";     Desc = "JDWP debug agent, remote debugging enabled" },
+                @{ Flag = "-agentpath:";         Desc = "native agent loaded, bypasses Java sandbox" }
             )
             foreach ($sf in $suspiciousFlags) {
-                if ($cmdLine -match [regex]::Escape("-$sf")) {
-                    $detectedPatterns += "SuspiciousFlag-$sf"
+                if ($cmdLine -match [regex]::Escape($sf.Flag)) {
+                    $results.Add("Suspicious JVM flag — $($sf.Flag) ($($sf.Desc))")
                 }
             }
-
-            if ($detectedPatterns.Count -gt 0) {
-                Append-Log "  |  [!] JVM INJECTION DETECTED!" "#E53935" -Bold
-                foreach ($d in $detectedPatterns) {
-                    Append-Log "  |    - $d" "#EF5350"
-                    [void]$results.Add($d)
-                }
-            } else {
-                Append-Log "  |  [v] No JVM injection patterns detected." "#81C784"
-            }
-        } catch {
-            Append-Log "  |  [!] Could not retrieve cmdline. Run as Admin." "#FFB74D"
         }
-    }
+    } catch { }
+
     return $results
 }
 
-function Invoke-FullScan {
-    param([string]$TargetPath, [switch]$DeepScan)
+function Write-Rule {
+    param([string]$Char = "─", [int]$Width = 76, [ConsoleColor]$Color = "DarkGray")
+    Write-Host ($Char * $Width) -ForegroundColor $Color
+}
 
-    $global:stopScan = $false
-    $global:reportLines.Clear()
-
-    Append-Log " ATLAS MOD ANALYZER SCAN STARTED" "#64B5F6" -Bold
-    Append-Log " Target: $TargetPath" "#AAAAAA"
-    Append-Log " Mode:   Full deep scan (patterns + obfuscation + bypass + JVM)" "#AAAAAA"
+function Write-SectionHeader {
+    param(
+        [string]$Title,
+        [int]$Count,
+        [ConsoleColor]$DotColor,
+        [ConsoleColor]$CountColor
+    )
     Write-Host ""
+    Write-Host "  " -NoNewline
+    Write-Host "●" -ForegroundColor $DotColor -NoNewline
+    Write-Host "  $Title  " -ForegroundColor White -NoNewline
+    Write-Host "($Count)" -ForegroundColor $CountColor
+    Write-Host ""
+}
 
-    if (-not (Test-Path $TargetPath -PathType Container)) {
-        Append-Log "[!] Directory does not exist!" "#E53935" -Bold
-        return
+function Write-SuspiciousCard {
+    param($Mod)
+
+    Write-Host ("  " + ("─" * 70)) -ForegroundColor DarkRed
+    Write-Host "  │ " -ForegroundColor DarkRed -NoNewline
+    Write-Host " FLAGGED " -ForegroundColor White -BackgroundColor DarkRed -NoNewline
+    Write-Host "  " -NoNewline
+    Write-Host $Mod.FileName -ForegroundColor Yellow
+    Write-Host ("  │ " + ("─" * 66)) -ForegroundColor DarkRed
+
+    if ($Mod.Patterns.Count -gt 0) {
+        Write-Host "  │" -ForegroundColor DarkRed
+        Write-Host "  │  " -ForegroundColor DarkRed -NoNewline
+        Write-Host "PATTERNS" -ForegroundColor DarkGray
+        foreach ($p in ($Mod.Patterns | Sort-Object)) {
+            Write-Host "  │    " -ForegroundColor DarkRed -NoNewline
+            Write-Host $p -ForegroundColor Red
+        }
     }
 
-    try { $jarFiles = Get-ChildItem -Path $TargetPath -Filter *.jar -ErrorAction Stop } catch {
-        Append-Log "[!] Error accessing directory." "#E53935"
-        return
+    $uniqueStrings = $Mod.Strings | Where-Object { $Mod.Patterns -notcontains $_ } | Sort-Object
+    if ($uniqueStrings.Count -gt 0) {
+        Write-Host "  │" -ForegroundColor DarkRed
+        Write-Host "  │  " -ForegroundColor DarkRed -NoNewline
+        Write-Host "STRINGS" -ForegroundColor DarkGray
+        foreach ($s in $uniqueStrings) {
+            Write-Host "  │    " -ForegroundColor DarkRed -NoNewline
+            Write-Host $s -ForegroundColor DarkYellow
+        }
     }
 
-    if ($jarFiles.Count -eq 0) {
-        Append-Log "[!] No JAR files found." "#FFB74D"
-        return
+    if ($Mod.Fullwidth -and $Mod.Fullwidth.Count -gt 0) {
+        Write-Host "  │" -ForegroundColor DarkRed
+        Write-Host "  │  " -ForegroundColor DarkRed -NoNewline
+        Write-Host "FULLWIDTH UNICODE" -ForegroundColor DarkGray
+        foreach ($fw in ($Mod.Fullwidth | Sort-Object)) {
+            Write-Host "  │    " -ForegroundColor DarkRed -NoNewline
+            Write-Host "FULLWIDTH: $fw" -ForegroundColor Cyan
+        }
     }
 
-    $total = $jarFiles.Count
-    Append-Log "Found $total JAR files to analyze. (press Q at any time to stop)`r`n" "#81C784"
+    Write-Host "  │" -ForegroundColor DarkRed
+    Write-Host ("  " + ("─" * 70)) -ForegroundColor DarkRed
+    Write-Host ""
+}
 
-    $verifiedMods   = [System.Collections.Generic.List[object]]::new()
-    $flaggedMods    = [System.Collections.Generic.List[object]]::new()
-    $bypassMods     = [System.Collections.Generic.List[object]]::new()
-    $obfuscatedMods = [System.Collections.Generic.List[object]]::new()
-    $unknownMods    = [System.Collections.Generic.List[object]]::new()
-    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+function Write-InjectionCard {
+    param($Mod)
 
-    # Pass 1: Hash verification (Modrinth + Megabase)
-    Append-Log " Pass 1/4 - Hash verification (Modrinth/Megabase)..." "#64B5F6"
-    for ($i = 0; $i -lt $total; $i++) {
-        Test-StopRequested
-        if ($global:stopScan) { break }
-        $jar = $jarFiles[$i]
-        Write-Host ("  [{0}/{1}] {2}" -f ($i + 1), $total, $jar.Name) -ForegroundColor DarkGray
+    Write-Host ("  " + ("─" * 70)) -ForegroundColor DarkMagenta
+    Write-Host "  │ " -ForegroundColor DarkMagenta -NoNewline
+    Write-Host " INJECTION " -ForegroundColor White -BackgroundColor DarkMagenta -NoNewline
+    Write-Host "  " -NoNewline
+    Write-Host $Mod.FileName -ForegroundColor Yellow
+    Write-Host ("  │ " + ("─" * 66)) -ForegroundColor DarkMagenta
 
-        $hash = Get-FileSHA1 -Path $jar.FullName
-        if ($hash) {
-            $modrinthData = Query-Modrinth -Hash $hash
-            if ($modrinthData.Slug) {
-                $whitelisted = @("viafabricplus", "viafabricversion", "lithium", "sodium", "iris", "fabric-api", "modmenu")
-                $isWhitelisted = $whitelisted -contains $modrinthData.Slug.ToLower()
-                $verifiedMods.Add([PSCustomObject]@{
-                    ModName = $modrinthData.Name; FileName = $jar.Name; FilePath = $jar.FullName; Whitelisted = $isWhitelisted
-                })
-                continue
+    foreach ($flag in $Mod.Flags) {
+        if ($flag -match "^(.+?) — (.+)$") {
+            $flagTitle = $matches[1]
+            $flagDesc  = $matches[2]
+        } else {
+            $flagTitle = $flag
+            $flagDesc  = ""
+        }
+
+        Write-Host "  │" -ForegroundColor DarkMagenta
+        Write-Host "  │  " -ForegroundColor DarkMagenta -NoNewline
+        Write-Host "◉ " -ForegroundColor Magenta -NoNewline
+        Write-Host $flagTitle -ForegroundColor White
+
+        if ($flagDesc -ne "") {
+            Write-Host "  │    " -ForegroundColor DarkMagenta -NoNewline
+            Write-Host $flagDesc -ForegroundColor Gray
+        }
+    }
+
+    Write-Host "  │" -ForegroundColor DarkMagenta
+    Write-Host ("  " + ("─" * 70)) -ForegroundColor DarkMagenta
+    Write-Host ""
+}
+
+function Write-ObfuscationCard {
+    param($Mod)
+
+    Write-Host ("  " + ("─" * 70)) -ForegroundColor DarkYellow
+    Write-Host "  │ " -ForegroundColor DarkYellow -NoNewline
+    Write-Host " OBFUSCATED " -ForegroundColor Black -BackgroundColor DarkYellow -NoNewline
+    Write-Host "  " -NoNewline
+    Write-Host $Mod.FileName -ForegroundColor Yellow
+    Write-Host ("  │ " + ("─" * 66)) -ForegroundColor DarkYellow
+
+    foreach ($flag in $Mod.Flags) {
+        if ($flag -match "^(.+?) — (.+)$") {
+            $flagTitle = $matches[1]
+            $flagDesc  = $matches[2]
+        } else {
+            $flagTitle = $flag
+            $flagDesc  = ""
+        }
+
+        Write-Host "  │" -ForegroundColor DarkYellow
+        Write-Host "  │  " -ForegroundColor DarkYellow -NoNewline
+        Write-Host "⚑ " -ForegroundColor Yellow -NoNewline
+        Write-Host $flagTitle -ForegroundColor White
+
+        if ($flagDesc -ne "") {
+            Write-Host "  │    " -ForegroundColor DarkYellow -NoNewline
+            Write-Host $flagDesc -ForegroundColor Gray
+        }
+    }
+
+    Write-Host "  │" -ForegroundColor DarkYellow
+    Write-Host ("  " + ("─" * 70)) -ForegroundColor DarkYellow
+    Write-Host ""
+}
+
+$verifiedMods    = @()
+$unknownMods     = @()
+$suspiciousMods  = @()
+$bypassMods      = @()
+$obfuscatedMods  = @()
+
+try {
+    $jarFiles = Get-ChildItem -Path $modsPath -Filter *.jar -ErrorAction Stop
+} catch {
+    Write-Host "Error accessing directory: $_" -ForegroundColor Red
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    exit 1
+}
+
+if ($jarFiles.Count -eq 0) {
+    Write-Host "No JAR files found in: $modsPath" -ForegroundColor Yellow
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    exit 0
+}
+
+$fileWord    = if ($jarFiles.Count -eq 1) { "file" } else { "files" }
+Write-Host "Found $($jarFiles.Count) JAR $fileWord to analyze" -ForegroundColor Green
+Write-Host
+
+$spinnerFrames = @("⣾","⣽","⣻","⢿","⡿","⣟","⣯","⣷")
+$totalFiles    = $jarFiles.Count
+$idx           = 0
+
+Write-Host "Pass 1 — Hash verification (Modrinth + Megabase)..." -ForegroundColor Cyan
+
+foreach ($jar in $jarFiles) {
+    $idx++
+    $spinner = $spinnerFrames[$idx % $spinnerFrames.Length]
+    Write-Host "`r[$spinner] Verifying: $idx/$totalFiles - $($jar.Name)" -ForegroundColor Yellow -NoNewline
+
+    $hash = Get-FileSHA1 -Path $jar.FullName
+
+    if ($hash) {
+        $modrinthData = Query-Modrinth -Hash $hash
+        if ($modrinthData.Slug) {
+
+            $modrinthWhitelistedSlugs = @("viafabricplus", "viafabricversion")
+            $isModrinthWhitelisted = $modrinthWhitelistedSlugs -contains $modrinthData.Slug.ToLower()
+
+            $verifiedMods += [PSCustomObject]@{
+                ModName             = $modrinthData.Name
+                FileName            = $jar.Name
+                FilePath            = $jar.FullName
+                ModrinthWhitelisted = $isModrinthWhitelisted
             }
-            $megabaseData = Query-Megabase -Hash $hash
-            if ($megabaseData.name) {
-                $verifiedMods.Add([PSCustomObject]@{
-                    ModName = $megabaseData.name; FileName = $jar.Name; FilePath = $jar.FullName; Whitelisted = $false
-                })
-                continue
+            continue
+        }
+        $megabaseData = Query-Megabase -Hash $hash
+        if ($megabaseData.name) {
+            $verifiedMods += [PSCustomObject]@{
+                ModName             = $megabaseData.Name
+                FileName            = $jar.Name
+                FilePath            = $jar.FullName
+                ModrinthWhitelisted = $false
             }
-        }
-
-        $src = Get-DownloadSource -Path $jar.FullName
-        $unknownMods.Add([PSCustomObject]@{ FileName = $jar.Name; FilePath = $jar.FullName; DownloadSource = $src })
-    }
-    Write-Host ""
-
-    # Pass 2: Mod scan (cheat patterns + strings)
-    Append-Log " Pass 2/4 - Pattern & String analysis..." "#64B5F6"
-    for ($i = 0; $i -lt $total; $i++) {
-        Test-StopRequested
-        if ($global:stopScan) { break }
-        $jar = $jarFiles[$i]
-        Write-Host ("  [{0}/{1}] {2}" -f ($i + 1), $total, $jar.Name) -ForegroundColor DarkGray
-
-        $verified = $verifiedMods | Where-Object { $_.FileName -eq $jar.Name -and $_.Whitelisted } | Select-Object -First 1
-        if ($verified) { continue }
-
-        $modRes = Invoke-ModScan -FilePath $jar.FullName -DeepScan:$DeepScan
-        if ($modRes.Patterns.Count -gt 0 -or $modRes.Strings.Count -gt 0 -or $modRes.Fullwidth.Count -gt 0) {
-            $flaggedMods.Add([PSCustomObject]@{
-                FileName = $jar.Name; Patterns = $modRes.Patterns; Strings = $modRes.Strings; Fullwidth = $modRes.Fullwidth
-            })
-            $verifiedMods | Where-Object { $_.FileName -eq $jar.Name } | ForEach-Object { $verifiedMods.Remove($_) }
-            $unknownMods | Where-Object { $_.FileName -eq $jar.Name } | ForEach-Object { $unknownMods.Remove($_) }
+            continue
         }
     }
-    Write-Host ""
 
-    # Pass 3: Bypass/injection scan
-    if ($DeepScan) {
-        Append-Log " Pass 3/4 - Bypass & Injection analysis (deep scan only)..." "#64B5F6"
-    } else {
-        Append-Log " Pass 3/4 - Bypass & Injection analysis (name-level only)..." "#64B5F6"
+    $src = Get-DownloadSource $jar.FullName
+    $unknownMods += [PSCustomObject]@{ FileName = $jar.Name; FilePath = $jar.FullName; DownloadSource = $src }
+}
+
+Write-Host "`r$(' ' * 100)`r" -NoNewline
+
+$modWord = if ($totalFiles -eq 1) { "mod" } else { "mods" }
+Write-Host "Pass 2 — Deep-scanning all $totalFiles $modWord..." -ForegroundColor Cyan
+$idx = 0
+
+foreach ($jar in $jarFiles) {
+    $idx++
+    $spinner = $spinnerFrames[$idx % $spinnerFrames.Length]
+    Write-Host "`r[$spinner] Scanning: $idx/$totalFiles - $($jar.Name)" -ForegroundColor Yellow -NoNewline
+
+
+    $verifiedEntry = $verifiedMods | Where-Object { $_.FileName -eq $jar.Name } | Select-Object -First 1
+    if ($verifiedEntry -and $verifiedEntry.ModrinthWhitelisted -eq $true) {
+        continue
     }
-    for ($i = 0; $i -lt $total; $i++) {
-        Test-StopRequested
-        if ($global:stopScan) { break }
-        $jar = $jarFiles[$i]
-        Write-Host ("  [{0}/{1}] {2}" -f ($i + 1), $total, $jar.Name) -ForegroundColor DarkGray
 
-        $verified = $verifiedMods | Where-Object { $_.FileName -eq $jar.Name -and $_.Whitelisted } | Select-Object -First 1
-        if ($verified) { continue }
+    $result = Invoke-ModScan -FilePath $jar.FullName
 
-        $bypassRes = Invoke-BypassScan -FilePath $jar.FullName -DeepScan:$DeepScan
-        if ($bypassRes.Count -gt 0) {
-            $bypassMods.Add([PSCustomObject]@{ FileName = $jar.Name; Flags = $bypassRes })
-            $verifiedMods | Where-Object { $_.FileName -eq $jar.Name } | ForEach-Object { $verifiedMods.Remove($_) }
-            $unknownMods | Where-Object { $_.FileName -eq $jar.Name } | ForEach-Object { $unknownMods.Remove($_) }
-            $flaggedMods | Where-Object { $_.FileName -eq $jar.Name } | ForEach-Object { $flaggedMods.Remove($_) }
+    if ($result.Patterns.Count -gt 0 -or $result.Strings.Count -gt 0 -or $result.Fullwidth.Count -gt 0) {
+        $suspiciousMods += [PSCustomObject]@{
+            FileName = $jar.Name
+            Patterns = $result.Patterns
+            Strings  = $result.Strings
+            Fullwidth = $result.Fullwidth
         }
-    }
-    Write-Host ""
-
-    # Pass 4: Obfuscation analysis
-    Append-Log " Pass 4/4 - Obfuscation analysis..." "#64B5F6"
-    for ($i = 0; $i -lt $total; $i++) {
-        Test-StopRequested
-        if ($global:stopScan) { break }
-        $jar = $jarFiles[$i]
-        Write-Host ("  [{0}/{1}] {2}" -f ($i + 1), $total, $jar.Name) -ForegroundColor DarkGray
-
-        $verified = $verifiedMods | Where-Object { $_.FileName -eq $jar.Name -and $_.Whitelisted } | Select-Object -First 1
-        if ($verified) { continue }
-
-        $obfRes = Invoke-ObfuscationScan -FilePath $jar.FullName -DeepScan:$DeepScan
-        if ($obfRes.Count -gt 0) {
-            $alreadyFlagged = ($flaggedMods | Where-Object { $_.FileName -eq $jar.Name }).Count -gt 0 -or
-                              ($bypassMods  | Where-Object { $_.FileName -eq $jar.Name }).Count -gt 0
-            if (-not $alreadyFlagged) {
-                $obfuscatedMods.Add([PSCustomObject]@{ FileName = $jar.Name; Flags = $obfRes })
-                $verifiedMods | Where-Object { $_.FileName -eq $jar.Name } | ForEach-Object { $verifiedMods.Remove($_) }
-                $unknownMods | Where-Object { $_.FileName -eq $jar.Name } | ForEach-Object { $unknownMods.Remove($_) }
-            }
-        }
-        Test-StopRequested
-        if ($global:stopScan) { break }
-    }
-    Write-Host ""
-
-    # JVM process scan
-    Append-Log " JVM PROCESS SCAN" "#64B5F6" -Bold
-    $jvmFlags = Invoke-JvmScan
-
-    $stopwatch.Stop()
-
-    if ($global:stopScan) {
-        Append-Log "`r`n[STOPPED] Scan cancelled by user." "#FFB74D" -Bold
-        return
-    }
-
-    # Summary
-    Write-Host ""
-    Append-Log " SCAN COMPLETE!" "#81C784" -Bold
-    Append-Log " Total:          $total" "#FFFFFF"
-    Append-Log " Verified:       $($verifiedMods.Count)" "#81C784"
-    Append-Log " Unknown:        $($unknownMods.Count)" "#FFB74D"
-    Append-Log " Flagged:        $($flaggedMods.Count)" "#E53935"
-    Append-Log " Bypass/Inject:  $($bypassMods.Count)" "#EF5350"
-    Append-Log " Obfuscated:     $($obfuscatedMods.Count)" "#FFF176"
-    Append-Log " JVM Issues:     $($jvmFlags.Count)" "#FFB74D"
-    Append-Log " Elapsed:        $([math]::Round($stopwatch.Elapsed.TotalSeconds, 1))s" "#888888"
-
-    Write-Host ""
-    Write-Host "  VERIFIED MODS" -ForegroundColor Green
-    foreach ($vm in $verifiedMods) {
-        Write-Host "    ✓ $($vm.ModName) → $($vm.FileName)" -ForegroundColor DarkGray
-    }
-
-    Write-Host ""
-    Write-Host "  UNKNOWN MODS" -ForegroundColor Yellow
-    foreach ($um in $unknownMods) {
-        $srcText = if ($um.DownloadSource) { " (source: $($um.DownloadSource))" } else { "" }
-        Write-Host "    ? $($um.FileName)$srcText" -ForegroundColor Yellow
-    }
-
-    Write-Host ""
-    Write-Host "  FLAGGED MODS" -ForegroundColor Red
-    foreach ($fm in $flaggedMods) {
-        Append-Log " [FLAGGED] $($fm.FileName)" "#E53935" -Bold
-        foreach ($p in $fm.Patterns) { Append-Log "    Pattern: $p" "#EF5350" }
-        foreach ($s in $fm.Strings) { Append-Log "    String: $s" "#FFB74D" }
-        foreach ($f in $fm.Fullwidth) { Append-Log "    Fullwidth: $f" "#9E9E9E" }
-    }
-
-    Write-Host ""
-    Write-Host "  BYPASS / INJECTION DETECTED" -ForegroundColor Magenta
-    foreach ($bm in $bypassMods) {
-        Append-Log " [INJECTION] $($bm.FileName)" "#EF5350" -Bold
-        foreach ($fl in $bm.Flags) { Append-Log "    $fl" "#FFB74D" }
-    }
-
-    Write-Host ""
-    Write-Host "  OBFUSCATED MODS" -ForegroundColor Yellow
-    foreach ($om in $obfuscatedMods) {
-        Append-Log " [OBFUSCATED] $($om.FileName)" "#FFF176" -Bold
-        foreach ($fl in $om.Flags) { Append-Log "    $fl" "#AAAAAA" }
+        $verifiedMods = $verifiedMods | Where-Object { $_.FileName -ne $jar.Name }
     }
 }
 
-# --- MAIN LOOP ---
-$defaultPath = "$env:USERPROFILE\AppData\Roaming\.minecraft\mods"
+Write-Host "`r$(' ' * 100)`r" -NoNewline
 
-Show-Banner
+Write-Host "Pass 3 — Bypass/injection scan on all $totalFiles $modWord..." -ForegroundColor Magenta
+$idx = 0
 
-Write-Host "Target Path [$defaultPath]:" -ForegroundColor Gray
-Write-Host "> " -NoNewline -ForegroundColor DarkCyan
-$inputPath = Read-Host
-$targetPath = if ([string]::IsNullOrWhiteSpace($inputPath)) { $defaultPath } else { $inputPath }
+foreach ($jar in $jarFiles) {
+    $idx++
+    $spinner = $spinnerFrames[$idx % $spinnerFrames.Length]
+    Write-Host "`r[$spinner] Bypass scan: $idx/$totalFiles - $($jar.Name)" -ForegroundColor Yellow -NoNewline
 
-Write-Host ""
-Invoke-FullScan -TargetPath $targetPath -DeepScan
 
-Write-Host ""
-Write-Host "Save report to file? (Y/N): " -NoNewline -ForegroundColor Gray
-$saveAns = Read-Host
-if ($saveAns -match '^(y|yes)$') {
-    $defaultName = "AtlasScanReport_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
-    Write-Host "Save as [$defaultName]: " -NoNewline -ForegroundColor Gray
-    $fileName = Read-Host
-    if ([string]::IsNullOrWhiteSpace($fileName)) { $fileName = $defaultName }
-    try {
-        $global:reportLines | Out-File -FilePath $fileName -Encoding UTF8
-        Write-Host "Report saved to $fileName" -ForegroundColor Green
-    } catch {
-        Write-Host "Failed to save report: $($_.Exception.Message)" -ForegroundColor Red
+    $verifiedEntry = $verifiedMods | Where-Object { $_.FileName -eq $jar.Name } | Select-Object -First 1
+    if ($verifiedEntry -and $verifiedEntry.ModrinthWhitelisted -eq $true) {
+        continue
+    }
+
+    $bypassFlags = Invoke-BypassScan -FilePath $jar.FullName
+
+    if ($bypassFlags.Count -gt 0) {
+        $bypassMods += [PSCustomObject]@{
+            FileName = $jar.Name
+            Flags    = $bypassFlags
+        }
+        $verifiedMods = $verifiedMods | Where-Object { $_.FileName -ne $jar.Name }
+        $unknownMods  = $unknownMods  | Where-Object { $_.FileName -ne $jar.Name }
     }
 }
 
+Write-Host "`r$(' ' * 100)`r" -NoNewline
+
+Write-Host "Pass 4 — Obfuscation analysis on all $totalFiles $modWord..." -ForegroundColor DarkCyan
+$idx = 0
+
+foreach ($jar in $jarFiles) {
+    $idx++
+    $spinner = $spinnerFrames[$idx % $spinnerFrames.Length]
+    Write-Host "`r[$spinner] Obf scan: $idx/$totalFiles - $($jar.Name)" -ForegroundColor Yellow -NoNewline
+
+    $obfFlags = Invoke-ObfuscationScan -FilePath $jar.FullName
+
+    if ($obfFlags.Count -gt 0) {
+        $alreadyFlagged = ($suspiciousMods | Where-Object { $_.FileName -eq $jar.Name }).Count -gt 0 -or
+                          ($bypassMods     | Where-Object { $_.FileName -eq $jar.Name }).Count -gt 0
+        if (-not $alreadyFlagged) {
+            $obfuscatedMods += [PSCustomObject]@{
+                FileName = $jar.Name
+                Flags    = $obfFlags
+            }
+            $verifiedMods = $verifiedMods | Where-Object { $_.FileName -ne $jar.Name }
+        }
+    }
+}
+
+Write-Host "`r$(' ' * 100)`r" -NoNewline
+
+$jvmFlags = @()
+Write-Host "Pass 5 — Scanning JVM for agents and injections..." -ForegroundColor DarkYellow
+$jvmFlags = Invoke-JvmScan
+if ($jvmFlags.Count -gt 0) {
+    Write-Host "   JVM issues found!" -ForegroundColor Yellow
+} else {
+    Write-Host "   JVM looks clean" -ForegroundColor DarkGray
+}
+
+Write-Host "`r$(' ' * 100)`r" -NoNewline
+
+if ($verifiedMods.Count -gt 0) {
+    Write-SectionHeader -Title "VERIFIED MODS" -Count $verifiedMods.Count -DotColor Green -CountColor Green
+    Write-Rule "─" 76 DarkGray
+    foreach ($mod in $verifiedMods) {
+        Write-Host "  ✓ " -ForegroundColor Green -NoNewline
+        Write-Host "$($mod.ModName)" -ForegroundColor White -NoNewline
+        Write-Host " → " -ForegroundColor Gray -NoNewline
+        Write-Host "$($mod.FileName)" -ForegroundColor DarkGray
+    }
+    Write-Host ""
+}
+
+if ($unknownMods.Count -gt 0) {
+    Write-SectionHeader -Title "UNKNOWN MODS" -Count $unknownMods.Count -DotColor Yellow -CountColor Yellow
+    Write-Rule "─" 76 DarkGray
+    foreach ($mod in $unknownMods) {
+        $name = $mod.FileName
+        if ($name.Length -gt 50) { $name = $name.Substring(0,47) + "..." }
+        $topLine    = "  ╔═ ? " + $name + " " + ("═" * (65 - $name.Length)) + "╗"
+        $sourceText = if ($mod.DownloadSource) { "Source: $($mod.DownloadSource)" } else { "Source: ?" }
+        $bottomLine = "  ╚═ " + $sourceText + " " + ("═" * (67 - $sourceText.Length)) + "╝"
+        Write-Host $topLine    -ForegroundColor Yellow
+        Write-Host $bottomLine -ForegroundColor Yellow
+        Write-Host ""
+    }
+}
+
+if ($suspiciousMods.Count -gt 0) {
+    Write-SectionHeader -Title "SUSPICIOUS MODS" -Count $suspiciousMods.Count -DotColor Red -CountColor Red
+    Write-Rule "─" 76 DarkGray
+    Write-Host ""
+    foreach ($mod in $suspiciousMods) {
+        Write-SuspiciousCard -Mod $mod
+    }
+}
+
+if ($bypassMods.Count -gt 0) {
+    Write-SectionHeader -Title "BYPASS / INJECTION DETECTED" -Count $bypassMods.Count -DotColor Magenta -CountColor Magenta
+    Write-Rule "─" 76 DarkGray
+    Write-Host ""
+    foreach ($mod in $bypassMods) {
+        Write-InjectionCard -Mod $mod
+    }
+}
+
+if ($obfuscatedMods.Count -gt 0) {
+    Write-SectionHeader -Title "OBFUSCATED MODS" -Count $obfuscatedMods.Count -DotColor DarkYellow -CountColor Yellow
+    Write-Rule "─" 76 DarkGray
+    Write-Host ""
+    foreach ($mod in $obfuscatedMods) {
+        Write-ObfuscationCard -Mod $mod
+    }
+}
+
+if ($jvmFlags.Count -gt 0) {
+    Write-SectionHeader -Title "JVM / RUNTIME INJECTION" -Count $jvmFlags.Count -DotColor Yellow -CountColor Yellow
+    Write-Rule "─" 76 DarkGray
+    Write-Host ""
+    Write-Host ("  " + ("─" * 70)) -ForegroundColor DarkYellow
+    Write-Host "  │ " -ForegroundColor DarkYellow -NoNewline
+    Write-Host " JVM " -ForegroundColor Black -BackgroundColor Yellow -NoNewline
+    Write-Host "  javaw / java process" -ForegroundColor Yellow
+    Write-Host ("  │ " + ("─" * 66)) -ForegroundColor DarkYellow
+    foreach ($flag in $jvmFlags) {
+        $ft = $flag; $fd = ""; $fpath = ""
+        if ($flag -match "^(.+?) — (.+) \(path: (.+)\)$") {
+            $ft = $matches[1]; $fd = $matches[2]; $fpath = $matches[3]
+        } elseif ($flag -match "^(.+?) — (.+)$") {
+            $ft = $matches[1]; $fd = $matches[2]
+        }
+        Write-Host "  │" -ForegroundColor DarkYellow
+        Write-Host "  │  " -ForegroundColor DarkYellow -NoNewline
+        Write-Host "◉ " -ForegroundColor Yellow -NoNewline
+        Write-Host $ft -ForegroundColor White
+        if ($fd -ne "") {
+            Write-Host "  │    " -ForegroundColor DarkYellow -NoNewline
+            Write-Host $fd -ForegroundColor Gray
+        }
+        if ($fpath -ne "") {
+            $display = if ($fpath.Length -gt 60) { "..." + $fpath.Substring($fpath.Length - 57) } else { $fpath }
+            Write-Host "  │    " -ForegroundColor DarkYellow -NoNewline
+            Write-Host $display -ForegroundColor DarkGray
+        }
+    }
+    Write-Host "  │" -ForegroundColor DarkYellow
+    Write-Host ("  " + ("─" * 70)) -ForegroundColor DarkYellow
+    Write-Host ""
+}
+
+Write-Host "SUMMARY" -ForegroundColor Cyan
+Write-Rule "━" 76 Blue
+Write-Host "  Total files scanned: " -ForegroundColor Gray -NoNewline; Write-Host "$totalFiles"                   -ForegroundColor White
+Write-Host "  Verified mods:       " -ForegroundColor Gray -NoNewline; Write-Host "$($verifiedMods.Count)"        -ForegroundColor Green
+Write-Host "  Unknown mods:        " -ForegroundColor Gray -NoNewline; Write-Host "$($unknownMods.Count)"         -ForegroundColor Yellow
+Write-Host "  Suspicious mods:     " -ForegroundColor Gray -NoNewline; Write-Host "$($suspiciousMods.Count)"      -ForegroundColor Red
+Write-Host "  Bypass/Injected:     " -ForegroundColor Gray -NoNewline; Write-Host "$($bypassMods.Count)"          -ForegroundColor Magenta
+Write-Host "  Obfuscated mods:     " -ForegroundColor Gray -NoNewline; Write-Host "$($obfuscatedMods.Count)"      -ForegroundColor Yellow
+Write-Host "  JVM issues:          " -ForegroundColor Gray -NoNewline; Write-Host "$($jvmFlags.Count)"            -ForegroundColor Yellow
+Write-Host
+Write-Rule "━" 76 Blue
 Write-Host ""
-Write-Host "Exiting Atlas Mod Analyzer." -ForegroundColor DarkGray
+Write-Host "  Analysis complete! Thanks for using Atlas Mod Analyzer" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Created by: " -ForegroundColor White -NoNewline
+Write-Host "Tonynoh" -ForegroundColor Cyan
+Write-Host ""
+Write-Rule "━" 76 Blue
+Write-Host ""
+Write-Host "Press any key to exit..." -ForegroundColor DarkGray
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
