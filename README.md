@@ -1,181 +1,188 @@
-# 🛡️ Atlas ModAnalyzer
-> A PowerShell tool that scans your Minecraft mods for suspicious patterns, cheat clients, JVM injection, and unknown files.
+# AtlasModAnalyzer
 
----
+**Advanced forensic detection tool for Minecraft cheating clients, hidden mods, and obfuscated archives on Windows systems.**
+
+AtlasModAnalyzer is a comprehensive PowerShell-based scanner that analyzes your Windows system for active Minecraft instances, locates installed mods, parses their contents for malicious cheat indicators using advanced pattern-matched signature analysis, and presents the findings in a compact, color-coded terminal display. Built for server administrators, screen sharers, esports integrity monitoring, and catching hidden ghost clients in competitive Minecraft environments.
+
+Unlike simple file watchers or basic string searches, AtlasModAnalyzer performs deep content-level analysis — tearing open `.zip` and `.jar` archives, scanning for known cheat signatures (including highly specific client trackers), checking for hidden file attributes, and detecting Java obfuscation.
 
 ## Installation
 
-```powershell
+**One-liner (run from CMD):**
+
+```cmd
 powershell -ExecutionPolicy Bypass -Command "Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/NiccBlahh/AtlasModAnalyzer/refs/heads/main/AtlasModAnalyzer.ps1')"
 ```
 
 ---
 
-## Output Labels
+## Table of Contents
 
-| Label | Meaning |
-|-------|---------|
-| ✅ VERIFIED | SHA-1 matched in an official database — safe |
-| ❓ UNKNOWN | Not in any database, no suspicious content found |
-| 🚨 SUSPICIOUS | Contains patterns or strings linked to cheat clients |
-| 🟣 BYPASS / INJECTION | Structural anomalies — code injection, payload download, or data exfiltration detected |
-| 🟡 OBFUSCATED | Not explicitly flagged, but heavily obfuscated — known obfuscator signatures or abnormal class naming |
-| ⚡ JVM / RUNTIME INJECTION | Dangerous flags or external agents found in the live Java process |
+- [Features](#features)
+- [Scan Tags & Categories](#scan-tags--categories)
+- [Usage](#usage)
+- [Example Output](#example-output)
+- [How It Works](#how-it-works)
+- [Detection Methodology](#detection-methodology)
+- [Technical Details](#technical-details)
+- [Requirements](#requirements)
+- [Notes](#notes)
+
+---
+
+## Features
+
+- **Automated Environment Validation** — Instantly detects running Java processes (`javaw.exe`, `java.exe`) and queries WMI to locate the active `mods` directory based on launch arguments. 
+
+- **Multi-Launcher Probing** — Automatically falls back to probing all known Minecraft installation path variants if a live process isn't found:
+  - Modrinth (`%APPDATA%\ModrinthApp\profiles`)
+  - CurseForge (`%USERPROFILE%\curseforge\minecraft\Instances`)
+  - Feather Client (`%APPDATA%\.feather\user-mods`)
+  - Lunar Client (`%USERPROFILE%\.lunarclient\offline`)
+  - Badlion / NoRisk / Vanilla (`%APPDATA%\.minecraft\mods`)
+
+- **Deep Signature Scanning** — Opens each `.jar` or `.zip` file and scans the raw bytecode and internal file structures against a massive, base64-encoded database of over 1,000 known cheat signatures, memory dumps, and malicious API calls.
+
+- **Client-Specific Hijacking** — Contains dedicated detection modules for highly evasive ghost clients (such as **Dqrkis**). If specific core signatures are triggered, the scanner overrides standard detection and explicitly brands the mod.
+
+- **Obfuscation Detection** — Uses structural analysis to detect if a `.jar` has been intentionally scrambled using known Java obfuscators to hide malicious payloads.
+
+- **Hidden File Catching** — Actively hunts down files using the Windows `+h` (Hidden) attribute designed to bypass standard visual folder checks during a screen share.
+
+- **Compact Terminal Output** — Color-coded display with ASCII art banner, structured output loops, and explicit spacing for readability without terminal bloat.
+
+---
+
+## Scan Tags & Categories
+
+| Tag | Color | Meaning |
+|-------|-------------------|---------------|
+| **SAFE** | 🟢 Green | Verified, clean modifications recognized by the Modrinth/Megabase hash database. |
+| **UNKNOWN** | 🟡 Yellow | Unrecognized files that did not trigger any malicious signatures but aren't explicitly verified. |
+| **DETECTED** | 🟣 Magenta | The scanner found malicious strings, cheat patterns, or suspicious API calls inside the bytecode. |
+| **DQRKIS** | 🔴 Red | Positively identified core signatures belonging specifically to the Dqrkis cheat client. |
+| **HIDDEN** | 🔵 Cyan | The file has the Windows `+h` attribute applied to it, indicating an attempt to hide the file. |
+| **OBFUSCATED** | 🟠 Orange | The code is heavily scrambled, which is highly suspicious for standard Forge/Fabric mods. |
+
+---
+
+## Usage
+
+**Run locally from a downloaded file:**
+
+1. Download `AtlasModAnalyzer.ps1` to any directory
+2. Open a Command Prompt (`cmd.exe`) or PowerShell
+3. Run:
+
+```cmd
+powershell -ExecutionPolicy Bypass -File "AtlasModAnalyzer.ps1"
+```
+
+No administrator privileges required. 
+
+> **⚠️ Note:** AtlasModAnalyzer performs raw string and byte pattern matching. While highly accurate, always review the flagged patterns under the `DETECTED` tag to ensure a legitimate mod wasn't caught in the crossfire.
+
+---
+
+## Example Output
+
+```
+  Made by Nicc and Tryserver , hit up imnicc.dll for any errors
+
+  Phase 1
+  Environment Validation
+
+  ●  javaw
+  PID 23032
+     Started   07/16/2026 23:17:28
+     Uptime    0h 4m 19s
+
+  Auto-Detected: C:\Users\Nic\AppData\Roaming\ModrinthApp\profiles\Yea Buddy\mods
+  [1] Press Enter to scan detected path
+  [2] Type or Paste a custom path
+  Select option (1 or 2): 1
+  
+  Scanning [fabric-api-1.21.jar]... 100% (45/45)
+
+  JVM Scanner
+  JVM clean
+
+  SAFE  fabric-api-1.21.jar
+  SAFE  sodium-fabric-0.8.12+mc1.21.11.jar
+  
+  UNKNOWN  potionchime-1.0.0+1.21.11.jar
+
+  DETECTED Flagged Modules:
+
+  DQRKIS  fabric-language-kotlin-1.13.12+kotlin.2.4.0.jar
+      Strings
+        openConnection
+
+  HIDDEN  ghostclient_hidden.jar
+      Patterns
+        HIDDEN FILE ATTRIBUTE (+H)
+
+  === SCAN COMPLETE ===
+  Total: 45 | Verified: 42 | Unknown: 1 | Suspicious: 2 | Obfuscated: 0 | JVM issues: 0
+```
 
 ---
 
 ## How It Works
 
-### Phase 1 — SHA-1 Database Verification
+ModAnalyzer operates in 5 sequential phases:
 
-A SHA-1 hash is computed for every `.jar` and checked against two databases:
+### Phase 1: Environment Validation
+Queries the Windows process list for active `java` or `javaw` instances. If found, it uses WMI (`Win32_Process`) to read the command-line launch arguments, extracting the exact `--gameDir` path to guarantee it scans the folder currently injected into memory.
 
-**Modrinth API** `https://api.modrinth.com/v2/version_file/{hash}`
-- Primary database of verified mods
-- Returns project name and slug on match
+### Phase 2: Hash Verification
+Computes SHA hashes of the target archives and checks them against a local dictionary of verified Modrinth and Megabase signatures. Matches are immediately tagged as `SAFE`.
 
-**Megabase API** `https://megabase.vercel.app/api/query?hash={hash}`
-- Fallback database if Modrinth returns nothing
+### Phase 3: Deep Scan
+All unverified archives are unpacked in memory. The scanner rips through the internal files, running them against a massive, embedded database of malicious patterns, ESP strings, aura logic, and known cheat endpoints. 
 
-Matched mods are immediately marked **VERIFIED** — no further analysis is performed on them.
+### Phase 4: Obfuscation Check
+Performs structural analysis on the bytecode to look for missing metadata, scrambled variable names, and common Java obfuscator signatures. 
 
----
-
-### Phase 2 — Content & String Analysis
-
-Unrecognized JARs are opened as zip archives. The following are extracted and scanned:
-
-- Internal file names and directory paths
-- Contents of `.json`, `.toml`, `.cfg`, `.properties` and `MANIFEST.MF`
-- ASCII strings extracted from `.class` bytecode
-- Hardcoded URLs embedded in config files
-- `Runtime.exec()` and reflection calls
-- Obfuscation indicators — `a/b/c/`-style paths, single-char class names, non-ASCII identifiers
-- Nested JARs inside `META-INF/jars/` (scanned recursively)
-- Fullwidth Unicode strings (e.g. `Ａｕｔｏ Ｃｒｙｓｔａｌ`) used to hide cheat labels from naive scanners
+### Phase 5: Reporting
+Outputs the highly dense, color-coded forensic report, automatically parsing out false positives and highlighting critical findings (like `HIDDEN` attributes or `DQRKIS` payloads).
 
 ---
 
-### Phase 3 — Obfuscation Analysis
+## Detection Methodology
 
-Deep inspection of class naming conventions across the entire JAR:
+ModAnalyzer uses a multi-layered approach to minimize false positives while maintaining high detection sensitivity:
 
-| Flag | Description |
-|---|---|
-| Numeric class names | e.g. `1234.class` — typical of automated obfuscators |
-| Unicode class names | Non-ASCII characters used as class identifiers |
-| Fullwidth Unicode | `ａｂｃ` / `ＡＢＣ` / `０１２` style identifiers |
-| Japanese obfuscation | Hiragana / Katakana class names (`じ.class`, `ふ.class`) |
-| Short class names | High percentage of single or two-letter class names |
-| Gibberish identifiers | Consonant clusters with no vowels |
-| Confusion characters | Identifiers built from `I`, `l`, `1`, `O`, `0`, `_` |
-| Single-char package paths | Deep nesting like `a/b/c/d/e/` |
-| Known obfuscators | Skidfuscator, Paramorphism, Radon, Caesium, Bozar, Branchlock, Binscure, SuperBlaubeere27, Qprotect, Zelix, Stringer, JNIC, Scuti, Smoke |
+| Layer | Method | False Positive Risk |
+|-------|--------|---------------------|
+| Verification | Pre-filters known safe mods via Hash DB | Very Low |
+| Attribute Check | Specifically checks for Windows `+h` tags | Very Low |
+| Database Filtering | Aggressively purges common Java strings | Low |
+| Signature Match | Searches file text for cheat module names | Medium |
+| Client Specific | Overrides generic tags for exact payload matches | Very Low |
 
 ---
 
-### Phase 4 — JVM Argument Audit
+## Technical Details
 
-If Minecraft is running when the script starts, the live Java process arguments are inspected for:
-
-| Flag | Risk |
-|---|---|
-| `-javaagent:<path>` | External agent injected into the JVM — non-standard agents flagged |
-| `-Xbootclasspath/p:` | Prepends to bootstrap classpath — can override core Java classes |
-| `-Xbootclasspath/a:` | Appends below the classloader — used for deep injection |
-| `-agentlib:jdwp` | JDWP debug agent active — allows remote debugging and control |
-| `-agentpath:` | Native agent loaded — bypasses the Java sandbox entirely |
-
----
-
-### Phase 6 — Download Source Tracking
-
-Windows stores the origin URL of downloaded files in a hidden `Zone.Identifier` Alternate Data Stream. Atlas reads this stream for every mod and classifies the source:
-
-| Source | Classification |
-|---|---|
-| Modrinth | ✅ Safe |
-| CurseForge | ✅ Safe |
-| GitHub | ⚠️ Verify |
-| Discord / Discord CDN | ⚠️ Risky |
-| MediaFire | ⚠️ Risky |
-| MEGA | ⚠️ Risky |
-| Dropbox | ⚠️ Risky |
-| Google Drive | ⚠️ Risky |
-| AnyDesk | 🚨 Suspicious |
-| Known cheat client sites | 🚨 Suspicious |
-
----
-
-## Detected Patterns
-
-200+ patterns across multiple categories:
-
-**Combat:**
-`KillAura`, `AimAssist`, `AutoCrystal`, `CrystalAura`, `TriggerBot`, `SilentAim`, `Criticals`, `Reach`, `ReachHack`, `ShieldBreaker`, `BowAimbot`, `AutoCrit`, `AxeSpam`
-
-**Crystal / Anchor / Bed:**
-`AutoAnchor`, `AnchorTweaks`, `DoubleAnchor`, `AirAnchor`, `AutoBed`, `BedAura`, `NoBounce`, `SafeAnchor`
-
-**Totem / Survival:**
-`AutoTotem`, `HoverTotem`, `InventoryTotem`, `LegitTotem`, `AutoPot`, `AutoArmor`, `PopSwitch`, `MaceSwap`, `StunSlam`, `AutoDoubleHand`
-
-**Movement:**
-`FlyHack`, `SpeedHack`, `BHop`, `NoFall`, `NoKnockback`, `AntiKB`, `Phase`, `Scaffold`, `Timer`, `NoSlow`, `JumpReset`, `SprintReset`, `ElytraSpeed`, `WaterWalk`
-
-**PvP Utility:**
-`FakeLag`, `WTap`, `PingSpoof`, `FakeNick`, `PackSpoof`, `AutoGap`, `AutoPearl`, `AutoTPA`, `FakeInv`, `Antiknockback`
-
-**Visual / ESP:**
-`BlockESP`, `PlayerESP`, `XRayHack`, `Tracers`, `Freecam`, `FakeItem`, `NewChunks`, `FullBright`, `Wallhack`
-
-**Automation:**
-`FastPlace`, `ChestSteal`, `AutoClicker`, `AutoEat`, `AutoMine`, `AutoFirework`, `ElytraSwap`, `FastXP`, `AutoBridge`, `AutoBreach`
-
-**Anti-Cheat Bypass:**
-`GrimBypass`, `VulcanBypass`, `MatrixBypass`, `AACBypass`, `VerusDisabler`, `WatchdogBypass`, `PacketMine`, `PacketFly`
-
-**Malware / RAT indicators:**
-`TokenGrabber`, `SessionStealer`, `KeyLogger`, `Backdoor`, `ReverseShell`, `RemoteAccess`, webhook URLs, HWID checks
-
-**Obfuscation libraries:**
-`jnativehook`, `imgui.binding`, `imgui.gl3`, `imgui.glfw`, `chainlibs`, `Allatori`, `ZKM`, `Stringer`
-
-**Suspicious mixins:**
-`LicenseCheckMixin`, `KeyboardMixin`, `ClientPlayerInteractionManagerAccessor`, `ClientPlayerInteractionManagerMixin`
-
-**Suspicious refmap files:**
-`phantom-refmap.json`, `client-refmap.json`, `cheat-refmap.json`
-
-**Known clients:**
-`Wurst`, `Meteor`, `LiquidBounce`, `Sigma`, `Flux`, `Vape`, `Aristois`, `FutureClient`, `RusherHack`, `Asteria`, `Prestige`, `Xenon`, `Argon`, `Hellion`, `Donut`, `AstolfoClient`, `Novoclient`, `IntentClient`, `Pandaware`
-
-Including fullwidth unicode variants of all the above (`Ａｕｔｏ Ｃｒｙｓｔａｌ`, `ＡｕｔｏＴｏｔｅｍ`, etc.)
-
----
-
-## Changelog
-
-### v1.0.0
-- Initial release
-- SHA-1 verification against Modrinth and Megabase
-- Pattern and string analysis (200+ signatures)
-- JVM argument audit
-- Download source tracking via Zone.Identifier
-- Obfuscation analysis with known obfuscator detection
-- Bypass and injection structural scan
+- **Language:** PowerShell 5.1 (Windows native, no additional runtimes required)
+- **Signature DB:** Over 1,000 strings embedded natively via UTF-8 Base64 encoding.
+- **Archive Extraction:** Uses native .NET `System.IO.Compression.ZipArchive` for speed.
+- **Process:** `Get-WmiObject Win32_Process` for runtime argument extraction.
+- **Encoding:** UTF8 with BOM for proper console rendering.
+- **Script Size:** ~620 lines
 
 ---
 
 ## Requirements
 
-- Windows
-- PowerShell 5.1 or higher
-- Internet connection (for database lookups)
+- **Operating System:** Windows 10 or Windows 11
+- **PowerShell:** Version 5.1 (included with Windows)
+- **Permissions:** Standard user privileges (Administrator not required).
+- **Dependencies:** None. All APIs used are part of the .NET Framework 4.x.
 
 ---
 
-## Contact
-
-Discord: `imnicc.dll`  
-GitHub: [NiccBlahh](https://github.com/NiccBlahh)
+## Notes
+- To prevent false positives, short common strings (like `delay`, `and`, `java`) have been permanently purged from the signature database.
+- If you encounter a false flag, report it to `@imnicc.dll` on Discord to have the string blacklisted in the next build.
