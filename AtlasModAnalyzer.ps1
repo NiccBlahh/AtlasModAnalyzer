@@ -16,90 +16,32 @@ Write-Host ""
 Write-Host "  Made by Nicc and Tryserver , hit up imnicc.dll for any errors" -ForegroundColor DarkGray
 Write-Host ""
 
-$strcanDirectory = $null
-
-$possibleDirs = [System.Collections.Generic.List[string]]::new()
-
-# Modrinth
-$modrinthDir = "$env:APPDATA\ModrinthApp\profiles"
-if (Test-Path -LiteralPath $modrinthDir) {
-    Get-ChildItem -Path $modrinthDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-        $p = Join-Path $_.FullName "mods"
-        if (Test-Path -LiteralPath $p) { $possibleDirs.Add($p) }
-    }
-}
-
-# CurseForge
-$cfDir = "$env:USERPROFILE\curseforge\minecraft\Instances"
-if (Test-Path -LiteralPath $cfDir) {
-    Get-ChildItem -Path $cfDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-        $p = Join-Path $_.FullName "mods"
-        if (Test-Path -LiteralPath $p) { $possibleDirs.Add($p) }
-    }
-}
-
-# Feather Client
-$featherDir = "$env:APPDATA\.feather\user-mods"
-if (Test-Path -LiteralPath $featherDir) { $possibleDirs.Add($featherDir) }
-
-# Lunar Client
-$lunarDir = "$env:USERPROFILE\.lunarclient\offline"
-if (Test-Path -LiteralPath $lunarDir) {
-    Get-ChildItem -Path $lunarDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-        $p = Join-Path $_.FullName "mods"
-        if (Test-Path -LiteralPath $p) { $possibleDirs.Add($p) }
-    }
-}
-
-# Badlion
-$badlionDir = "$env:APPDATA\.badlion\mods"
-if (Test-Path -LiteralPath $badlionDir) { $possibleDirs.Add($badlionDir) }
-
-# NoRisk
-$noriskDir = "$env:APPDATA\.norisk\mods"
-if (Test-Path -LiteralPath $noriskDir) { $possibleDirs.Add($noriskDir) }
-
-# Vanilla / MC Launcher
-$vanillaDir = "$env:APPDATA\.minecraft\mods"
-if (Test-Path -LiteralPath $vanillaDir) { $possibleDirs.Add($vanillaDir) }
-
-if ($possibleDirs.Count -gt 0) {
-    $mostRecent = $possibleDirs | ForEach-Object { Get-Item -LiteralPath $_ -ErrorAction SilentlyContinue } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    $strcanDirectory = $mostRecent.FullName
-}
-
 Write-Host ""
-Write-Host "  Auto-Detected: " -ForegroundColor DarkGray -NoNewline
-if ($strcanDirectory) { Write-Host "$strcanDirectory" -ForegroundColor White }
-else { Write-Host "None" -ForegroundColor DarkRed }
-
-Write-Host ""
-Write-Host "  Paste the path to your mods folder (or a .zip of it)," -ForegroundColor Gray
-Write-Host "  or press Enter to use the auto-detected path above." -ForegroundColor Gray
+Write-Host "  Paste the path to your mods folder (or a .zip of it)." -ForegroundColor Gray
 $rawPath = Read-Host "  Path"
 
-if ($rawPath -and $rawPath.Trim() -ne "") {
-    $strcanDirectory = $rawPath.Trim('"', "'", ' ')
-    if (-not (Test-Path -LiteralPath $strcanDirectory)) {
-        Write-Host "  Invalid path. Exiting." -ForegroundColor Red
+if (-not $rawPath -or $rawPath.Trim() -eq "") {
+    Write-Host "  No path entered. Exiting." -ForegroundColor Red
+    exit 1
+}
+
+$strcanDirectory = $rawPath.Trim('"', "'", ' ')
+if (-not (Test-Path -LiteralPath $strcanDirectory)) {
+    Write-Host "  Invalid path. Exiting." -ForegroundColor Red
+    exit 1
+}
+
+$itemInfo = Get-Item -LiteralPath $strcanDirectory
+if ($itemInfo -is [System.IO.FileInfo]) {
+    if ($itemInfo.Extension -match "\.zip$") {
+        Write-Host "  Extracting ZIP file for scanning..." -ForegroundColor DarkGray
+        $tempDir = Join-Path $env:TEMP ("ModScan_" + [Guid]::NewGuid().ToString().Substring(0,8))
+        Expand-Archive -LiteralPath $strcanDirectory -DestinationPath $tempDir -Force
+        $strcanDirectory = $tempDir
+    } else {
+        Write-Host "  Please provide a folder path or a .zip file." -ForegroundColor Red
         exit 1
     }
-
-    $itemInfo = Get-Item -LiteralPath $strcanDirectory
-    if ($itemInfo -is [System.IO.FileInfo]) {
-        if ($itemInfo.Extension -match "\.zip$") {
-            Write-Host "  Extracting ZIP file for scanning..." -ForegroundColor DarkGray
-            $tempDir = Join-Path $env:TEMP ("ModScan_" + [Guid]::NewGuid().ToString().Substring(0,8))
-            Expand-Archive -LiteralPath $strcanDirectory -DestinationPath $tempDir -Force
-            $strcanDirectory = $tempDir
-        } else {
-            Write-Host "  Please provide a folder path or a .zip file." -ForegroundColor Red
-            exit 1
-        }
-    }
-} elseif (-not $strcanDirectory) {
-    Write-Host "  No path selected. Exiting." -ForegroundColor Red
-    exit 1
 }
 
 Write-Host "  Scanning  " -ForegroundColor DarkGray -NoNewline
