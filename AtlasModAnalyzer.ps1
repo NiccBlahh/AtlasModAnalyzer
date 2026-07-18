@@ -440,6 +440,7 @@ Write-Host " | Verified: " -ForegroundColor DarkGray -NoNewline; Write-Host "$($
 Write-Host " | Unknown: " -ForegroundColor DarkGray -NoNewline; Write-Host "$($unrecognizedModules.Count)" -ForegroundColor Yellow -NoNewline
 Write-Host " | Suspicious: " -ForegroundColor DarkGray -NoNewline; Write-Host "$($anomalyaggedItems.Count)" -ForegroundColor $(if($anomalyaggedItems.Count -gt 0){"Magenta"}else{"Gray"}) -NoNewline
 Write-Host " | Obfuscated: " -ForegroundColor DarkGray -NoNewline; Write-Host "$($obfuscatedItems.Count)" -ForegroundColor $(if($obfuscatedItems.Count -gt 0){"Yellow"}else{"Gray"})
+Write-Host "  Credits to MeowModAnalyzer " -ForegroundColor DarkGray -NoNewline; Write-Host "$totalCount" -ForegroundColor White -NoNewline
 
 Write-Host "  Analysis complete" -ForegroundColor DarkGray
 Write-Host "  Press any key to exit" -ForegroundColor DarkGray
